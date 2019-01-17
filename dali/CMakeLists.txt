@@ -125,17 +125,12 @@ if (BUILD_TEST)
   add_dependencies(${test_main_bin} ${dali_lib} ${dali_kernel_test_lib} ${dali_kernel_lib})
 
   # We'll have to add dependency libs
-<<<<<<< HEAD
   target_link_libraries(${test_main_bin} PRIVATE
     "-Wl,--whole-archive $<TARGET_LINKER_FILE:${dali_kernel_test_lib}> -Wl,--no-whole-archive"
     "${dali_kernel_test_lib}"
     "${DALI_LIBS}"
     "${dali_lib}"
     "gtest")
-=======
-  target_link_libraries(${test_main_bin} PRIVATE "-Wl,--whole-archive $<TARGET_LINKER_FILE:${dali_kernel_test_lib}> -Wl,--no-whole-archive")
-  target_link_libraries(${test_main_bin} PRIVATE ${DALI_LIBS} ${dali_lib} gtest)
->>>>>>> ad7471d... Add dali_kernels and dali_kernel_test libraries.
 
   set_target_properties(${test_main_bin} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${TEST_BINARY_DIR})
