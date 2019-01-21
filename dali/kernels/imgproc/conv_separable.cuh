@@ -22,20 +22,58 @@ namespace kernels {
 constexpr int AnchorCenter = 0x7fffffff;
 
 enum class BorderMode {
-  Clamp, Mirror, Constant
+  None = -1, Clamp = 0, Mirror, Constant
 };
+
+struct SeparableFilterParams {
+  ConvolutionFilter filterHorz;
+  ConvolutionFilter filterVert;
+  BorderMode mode;
+};
+
+template <int channels, typename OutputElement, typename InputElement>
+struct LargeSeparableConvolutionGPU {
+  using Input = InListGPU<InputElement>;
+  using Output = OutListGPU<OutputElement>;
+
+  static TensorListShape<2> IntermediateImageShapes(const Input &in, const SeparableFilterParams &params) {
+    TensorListShape<2> sh;
+    sh.resize(in.num_samples());
+
+    int dw = 0, dh = 0;
+    if (params.filterHorz.size() < params.filterVert.size())
+      dw = params.filterHorz.size();
+    else
+      dh = params.filterVert.size();
+
+    for (int i = 0; i < sh.num_samples(); i++) {
+      auto ts = sh.tensor_shape_span(u);
+      ts[0] += dh;
+      ts[1] += dw;
+    }
+    return ts;
+  }
+
+  void Setup()
+
+};
+
 
 template <int channels, typename OutputElement, typename InputElement>
 struct SeparableConvolutionGPU {
   using Input = InListGPU<InputElement>;
   using Output = OutListGPU<OutputElement>;
 
-  KernelRequirements GetRequirements(const Input &input, ConvolutionFilter filterHorz, ConvolutionFilter filterVert, BorderMode mode) {
+  KernelRequirements GetRequirements(KernelContext &contex, const Input &input, const SeparableFilterParams &params) {
     KernelRequirements req;
     req.output_shapes = { input.shape };
     ScratchpadEstimator se;
-    se.add<IntermediateType>(AllocType::GPU, input.shape.total_elements);
+    req.scratch_sizes = se.sizes;
     return req;
+  }
+
+  void Run(KernelContext &contex, const Output &output, const Input &input, const SeparableFilterParams &params) {
+
   }
 };
 

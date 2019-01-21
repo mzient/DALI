@@ -449,6 +449,15 @@ struct TensorListShapeBase {
     return ret;
   }
 
+  void resize(int num_samples) {
+    shapes.resize(num_samples * sample_dim());
+  }
+
+  void resize(int num_samples, int dim) {
+    set_sample_dim(dim);
+    shapes.resize(num_samples * sample_ndim);
+  }
+
  protected:
   int size() const { return static_cast<const Derived *>(this)->size(); }
   int sample_dim() const { return static_cast<const Derived *>(this)->sample_dim(); }
