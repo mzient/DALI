@@ -12,29 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_
+#define DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_
+
 #include <cuda_runtime.h>
+#include <memory>
 #include "dali/kernels/kernel.h"
 #include "dali/kernels/imgproc/imgproc_common.h"
+#include "dali/kernels/imgproc/convolution/params.h"
+#include "dali/kernels/imgproc/convolution/separable.h"
 
 namespace dali {
 namespace kernels {
 
-constexpr int AnchorCenter = 0x7fffffff;
-
-enum class BorderMode {
-  None = -1, Clamp = 0, Mirror, Constant
-};
-
-struct SeparableFilterParams {
-  ConvolutionFilter filterHorz;
-  ConvolutionFilter filterVert;
-  BorderMode mode;
-};
-
-template <int channels, typename OutputElement, typename InputElement>
-struct LargeSeparableConvolutionGPU {
-  using Input = InListGPU<InputElement>;
-  using Output = OutListGPU<OutputElement>;
+template <int channels, typename OutputElement, typename InputElement,
+          typename Base_ = SerparableConvoltionFilter<channels, OutputElement, InputElement>>
+struct LargeSeparableConvolutionGPU : Base_ {
+  using Base = Base_;
+  using typename Base::Input;
+  using typename Base::Output;
 
   static TensorListShape<2> IntermediateImageShapes(const Input &in, const SeparableFilterParams &params) {
     TensorListShape<2> sh;
@@ -54,28 +50,47 @@ struct LargeSeparableConvolutionGPU {
     return ts;
   }
 
-  void Setup()
+  virtual KernelRequirements Setup(KernelContext &context, const Input &in, const SeparableFilterParams &params) {
+  }
 
+  virtual void Run(KernelContext &context, const Output &out, const Input &in, const SeparableFilterParams &params) {
+    // TODO
+  }
 };
-
 
 template <int channels, typename OutputElement, typename InputElement>
 struct SeparableConvolutionGPU {
-  using Input = InListGPU<InputElement>;
-  using Output = OutListGPU<OutputElement>;
+  using Input = InListGPU<InputElement, 3>;
+  using Output = OutListGPU<OutputElement, 3>;
 
-  KernelRequirements GetRequirements(KernelContext &contex, const Input &input, const SeparableFilterParams &params) {
-    KernelRequirements req;
+  using Impl = SerparableConvoltionFilter<channels, OutputElement, InputElement>;
+  using ImplPtr = std::unique_ptr<Impl>;
+
+  static ImplPtr SelectImpl(
+      KernelContext &context,
+      const Input &input,
+      const SeparableFilterParams &params) {
+    auto cur_impl = any_cast<ImplPtr*>(context.kernel_data);
+    if (cur_impl)
+      return std::move(*cur_impl);
+    else
+      return ImplPtr(new Impl(params));
+  }
+
+  static KernelRequirements GetRequirements(KernelContext &contex, const Input &input, const SeparableFilterParams &params) {
     req.output_shapes = { input.shape };
-    ScratchpadEstimator se;
-    req.scratch_sizes = se.sizes;
+    auto impl = SelectImpl(context, input, params);
+    auto req = impl->Setup();
+    context.data = std::move(impl);
     return req;
   }
 
-  void Run(KernelContext &contex, const Output &output, const Input &input, const SeparableFilterParams &params) {
+  static void Run(KernelContext &contex, const Output &output, const Input &input, const SeparableFilterParams &params) {
 
   }
 };
 
 }  // kernels
 }  // dali
+
+#endif  // DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_

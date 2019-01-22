@@ -14,29 +14,15 @@
 
 project(kernels)
 
-add_subdirectory(test)
-<<<<<<< HEAD
-add_subdirectory(common)
-=======
-add_subdirectory(imgproc)
->>>>>>> Reorganization
-
 # Get all the source files and dump test files
 file(GLOB tmp *.cc *.cu)
 set(DALI_KERNEL_SRCS ${DALI_KERNEL_SRCS} ${tmp})
 file(GLOB tmp *_test.cc *_test.cu)
 remove(DALI_KERNEL_SRCS "${DALI_KERNEL_SRCS}" ${tmp})
+set(DALI_KERNEL_SRCS ${DALI_KERNEL_SRCS} PARENT_SCOPE)
 
 if (BUILD_TEST)
   # get all the test srcs
   file(GLOB tmp *_test.cc *_test.cu)
+  set(DALI_KERNEL_TEST_SRCS ${DALI_KERNEL_TEST_SRCS} ${tmp} PARENT_SCOPE)
 endif()
-
-cuda_add_library(${dali_kernel_lib} STATIC "${DALI_KERNEL_SRCS}")
-cuda_add_library(${dali_kernel_test_lib} STATIC "${DALI_KERNEL_TEST_SRCS}")
-
-<<<<<<< HEAD
-target_link_libraries(${dali_kernel_test_lib} ${dali_kernel_lib})
-=======
-target_link_libraries(${dali_kernels_test_lib} ${dali_kernel_lib})
->>>>>>> Add dali_kernels and dali_kernel_test libraries.

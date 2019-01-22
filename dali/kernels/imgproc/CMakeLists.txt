@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(kernels)
-
-add_subdirectory(test)
+add_subdirectory(convolution)
 
 # Get all the source files and dump test files
 file(GLOB tmp *.cc *.cu)

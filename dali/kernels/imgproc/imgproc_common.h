@@ -12,6 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef DALI_KERNELS_IMGPROC_IMGPROC_COMMON_H_
+#define DALI_KERNELS_IMGPROC_IMGPROC_COMMON_H_
+
+
+#include <cuda_runtime.h>
 #include "dali/kernels/tensor_view.h"
 
 namespace dali {
@@ -26,8 +31,20 @@ enum class BorderMode {
 struct ConvolutionFilter {
   std::vector<float> coeffs;
   int anchor = AnchorCenter;
+  int size() const { return coeffs.size(); }
+  float operator()(int i) const {
+    return coeffs[i - (anchor ? anchor : size()/2)];
+  }
 };
 
+template <int channels, typename T>
+struct Pixel {
+  T data[channels];
+  __host__ __device__ T &operator[](int index) { return data[index]; }
+  __host__ __device__ const T &operator[](int index) const { return data[index]; }
+};
 
 }  // kernels
 }  // dali
+
+#endif  // DALI_KERNELS_IMGPROC_IMGPROC_COMMON_H_
