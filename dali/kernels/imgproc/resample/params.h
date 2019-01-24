@@ -12,12 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef DALI_KERNELS_IMGPROC_CONVOLUTION_PARAMS_H_
+#define DALI_KERNELS_IMGPROC_CONVOLUTION_PARAMS_H_
+
 #include <cuda_runtime.h>
-#include "../conv_separable.cuh"
+#include "dali/kernels/kernel.h"
+#include "dali/kernels/imgproc/imgproc_common.h"
 
 namespace dali {
 namespace kernels {
 
+enum ResamplingFilterType {
+  Gaussian,
+  Lanczos,
+};
+
+struct ResamplingParams {
+  int output_size;
+  ResamplingFilterType type;
+  float dilation;
+  int radius;
+};
+
+struct ResamplingParams2D {
+  ResamplingParams axes[2];
+};
 
 }  // namespace kernels
 }  // namespace dali
+
+#endif  // DALI_KERNELS_IMGPROC_CONVOLUTION_PARAMS_H_

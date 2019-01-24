@@ -16,23 +16,26 @@
 #define DALI_KERNELS_IMGPROC_CONVOLUTION_SEPARABLE_H_
 
 #include <cuda_runtime.h>
-#include "dali/kernels/imgproc/convolution/params.h"
+#include "dali/kernels/imgproc/resample/params.h"
 
 namespace dali {
 namespace kernels {
 
 
 template <int channels, typename OutputElement, typename InputElement>
-struct SerparableConvoltionFilter {
+struct SeparableResamplingFilter {
   using Input = InListGPU<InputElement, 3>;
   using Output = OutListGPU<OutputElement, 3>;
 
-  virtual ~SerparableConvoltionFilter() = default;
+  virtual ~SeparableResamplingFilter() = default;
 
-  virtual void Setup(KernelContext &context, const Input &in, const SeparableFilterParams &params) = 0;
-  virtual void Run(KernelContext &context, const Output &out, const Input &in, const SeparableFilterParams &params) = 0;
+  virtual KernelRequirements Setup(KernelContext &context, const Input &in, const std::vector<ResampleParams> &params) = 0;
+  virtual void Run(KernelContext &context, const Output &out, const Input &in, const std::vector<ResampleParams> &params) = 0;
 
-  static SerparableConvoltionFilter *CreateImpl(KernelContext &context, const Input &in, const SeparableFilterParams &params);
+  using Ptr = std::unique_ptr<SeparableResamplingFilter>;
+
+  static Ptr CreateImpl(KernelContext &context, const Input &in, const std::vector<ResampleParams> &params) {
+  }
 };
 
 }  // namespace kernels
