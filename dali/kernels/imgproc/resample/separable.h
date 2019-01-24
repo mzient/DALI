@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_KERNELS_IMGPROC_CONVOLUTION_SEPARABLE_H_
-#define DALI_KERNELS_IMGPROC_CONVOLUTION_SEPARABLE_H_
+#ifndef DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_H_
+#define DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_H_
 
 #include <cuda_runtime.h>
 #include "dali/kernels/imgproc/resample/params.h"
@@ -22,23 +22,25 @@ namespace dali {
 namespace kernels {
 
 
-template <int channels, typename OutputElement, typename InputElement>
+template <typename OutputElement, typename InputElement>
 struct SeparableResamplingFilter {
   using Input = InListGPU<InputElement, 3>;
   using Output = OutListGPU<OutputElement, 3>;
 
   virtual ~SeparableResamplingFilter() = default;
 
-  virtual KernelRequirements Setup(KernelContext &context, const Input &in, const std::vector<ResampleParams> &params) = 0;
-  virtual void Run(KernelContext &context, const Output &out, const Input &in, const std::vector<ResampleParams> &params) = 0;
+  using Params = std::vector<ResamplingParams2D>;
 
+  virtual KernelRequirements Setup(KernelContext &context, const Input &in, const Params &params) = 0;
+  virtual void Run(KernelContext &context, const Output &out, const Input &in, const Params &params) = 0;
   using Ptr = std::unique_ptr<SeparableResamplingFilter>;
 
-  static Ptr CreateImpl(KernelContext &context, const Input &in, const std::vector<ResampleParams> &params) {
-  }
+  static Ptr Create(const Params &params);
 };
 
 }  // namespace kernels
 }  // namespace dali
 
-#endif  // DALI_KERNELS_IMGPROC_CONVOLUTION_SEPARABLE_H_
+#include "separable_impl_select.h"
+
+#endif  // DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_H_

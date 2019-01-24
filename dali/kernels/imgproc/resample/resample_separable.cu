@@ -19,12 +19,12 @@ namespace dali {
 namespace kernels {
 
 struct ResamplingFilters {
-  cudaTextureObject_t filterTex;
-  cudaArray_t filterData;
+  //cudaTextureObject_t filterTex;
+  //cudaArray_t filterData;
 };
 
 void InitFilters(ResamplingFilters &filters, cudaStream_t stream) {
-  cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+  /*cudaChannelFormatDesc desc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
   const int N = 2;
   const int W = 128;
   cudaMallocArray(&filters.filterData, &desc, W, N);
@@ -44,7 +44,7 @@ void InitFilters(ResamplingFilters &filters, cudaStream_t stream) {
   viewDesc.width = W;
   viewDesc.height = H;
   viewDesc.format = cudaResViewFormatFloat1
-  cudaCreateTextureObject(&filter.filterTex, &resDesc, &texDesc, &viewDesc);
+  cudaCreateTextureObject(&filter.filterTex, &resDesc, &texDesc, &viewDesc);*/
 }
 
 }  // namespace kernels

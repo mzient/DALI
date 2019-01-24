@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_
-#define DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_
+#ifndef DALI_KERNELS_IMGPROC_RESAMPLE_CUH_
+#define DALI_KERNELS_IMGPROC_RESAMPLE_CUH_
 
 #include <cuda_runtime.h>
 #include <memory>
@@ -25,31 +25,33 @@
 namespace dali {
 namespace kernels {
 
-template <int channels, typename OutputElement, typename InputElement>
+template <typename OutputElement, typename InputElement>
 struct ResampleGPU {
   using Input = InListGPU<InputElement, 3>;
   using Output = OutListGPU<OutputElement, 3>;
 
-  using Impl = SeparableResamplingFilter<channels, OutputElement, InputElement>;
+  using Impl = SeparableResamplingFilter<OutputElement, InputElement>;
+  using Params = typename Impl::Params;
   using ImplPtr = typename Impl::Ptr;
 
   static Impl *SelectImpl(
       KernelContext &context,
       const Input &input,
-      const SeparableFilterParams &params) {
+      const Params &params) {
     auto cur_impl = any_cast<ImplPtr*>(context.kernel_data);
-    if (cur_impl && cur_impl->)
-    else
-      return ImplPtr(new Impl(params));
+    if (cur_impl) {
+      return cur_impl->get();
+    } else {
+      ImplPtr(Impl::Create(params));
+    }
   }
 
-  static KernelRequirements GetRequirements(KernelContext &context, const Input &input, const SeparableFilterParams &params) {
+  static KernelRequirements GetRequirements(KernelContext &context, const Input &input, const Params &params) {
     auto *impl = SelectImpl(context, input, params);
-    auto req = impl->Setup(context, input, params);
-    return req;
+    return impl->Setup(context, input, params);
   }
 
-  static void Run(KernelContext &contex, const Output &output, const Input &input, const SeparableFilterParams &params) {
+  static void Run(KernelContext &contex, const Output &output, const Input &input, const Params &params) {
 
   }
 };
@@ -57,4 +59,4 @@ struct ResampleGPU {
 }  // kernels
 }  // dali
 
-#endif  // DALI_KERNELS_IMGPROC_CONV_SEPARABLE_CUH_
+#endif  // DALI_KERNELS_IMGPROC_RESAMPLE_CUH_

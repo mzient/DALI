@@ -22,21 +22,26 @@
 namespace dali {
 namespace kernels {
 
-enum ResamplingFilterType {
+enum ResamplingFilterType : uint8_t {
   Gaussian,
   Lanczos,
 };
 
-struct ResamplingParams {
-  int output_size;
-  ResamplingFilterType type;
-  float dilation;
-  int radius;
+constexpr int KeepOriginalSize = -1;
+
+template <int dim>
+struct ResamplingParamsBase {
+  ResamplingFilterType type[dim];
+  uint8_t radii[dim];
+  float dilation[dim];
 };
 
-struct ResamplingParams2D {
-  ResamplingParams axes[2];
+template <int dim>
+struct ResamplingParams : ResamplingParamsBase<dim> {
+  int output_size[dim];
 };
+
+using ResamplingParams2D = ResamplingParams<2>;
 
 }  // namespace kernels
 }  // namespace dali

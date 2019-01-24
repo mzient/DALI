@@ -12,3 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "separable_large.h"
+
+namespace dali {
+namespace kernels {
+
+template <typename OutputElement, typename InputElement>
+SeparableResamplingFilter<OutputElement, InputElement>::Ptr
+SeparableResamplingFilter<OutputElement, InputElement>::Create(const Params &params) {
+  return Ptr(new LargeSeparableResamplingGPU<OutputElement, InputElement>());
+}
+
+} // kernels
+} // dali
