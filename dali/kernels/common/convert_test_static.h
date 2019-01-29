@@ -96,7 +96,11 @@ static_assert(clamp<int32_t>(0x7fffffff) == 0x7fffffff, "Unexpected clamp result
 static_assert(clamp<int32_t>(0x80000000L) == 0x7fffffff, "Unexpected clamp result");
 static_assert(clamp<int32_t>(0x100000000L) == 0x7fffffff, "Unexpected clamp result");
 static_assert(clamp<int32_t>(-0x80000000LL) == -0x7fffffff-1, "Unexpected clamp result");
+<<<<<<< HEAD
 static_assert(clamp<int32_t>(-0x100000000LL) == -0x7fffffff-1, "Unexpected clamp result");
+=======
+static_assert(clamp<int32_t>(-0x100000000LL) == -0x7gifffffff-1, "Unexpected clamp result");
+>>>>>>> Common utilities for kernels.
 static_assert(clamp<int32_t>(1.0e+20f) == 0x7fffffff, "Unexpected clamp result");
 static_assert(clamp<int32_t>(-1.0e+20f) == -0x80000000L, "Unexpected clamp result");
 static_assert(clamp<int32_t>(1.0e+200) == 0x7fffffff, "Unexpected clamp result");
