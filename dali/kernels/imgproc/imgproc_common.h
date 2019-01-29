@@ -43,7 +43,6 @@ struct Pixel {
   __host__ __device__ T &operator[](int index) { return data[index]; }
   __host__ __device__ const T &operator[](int index) const { return data[index]; }
 };
-
 }  // kernels
 }  // dali
 

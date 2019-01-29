@@ -25,6 +25,17 @@ struct ResamplingFilter {
   float *coeffs;
   int size;
   float scale, anchor;
+
+  __device__ float at(float x) const {
+    return at_abs(x*scale + anchor);
+  }
+
+  __device__ float at_abs(float x) const {
+    int x0 = max(0, static_cast<int>(x));
+    int x1 = min(size -1, x0 + 1);
+    float d = x - x0;
+    return __ldg(coeffs+x0) + d * (coeffs[x1] - coeffs[x0]);
+  }
 };
 
 struct ResamplingFilters {

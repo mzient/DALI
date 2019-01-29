@@ -137,7 +137,7 @@ struct LargeSeparableResamplingGPU : Base_ {
   }
 
   virtual void Run(KernelContext &context, const Output &out, const Input &in, const Params &params) {
-    // TODO
+    //context.scratchpad->AllocTensorList<
   }
 };
 
