@@ -31,10 +31,16 @@ struct ResamplingFilter {
   }
 
   __device__ float at_abs(float x) const {
-    int x0 = min(max(0, static_cast<int>(x)), size-1);
+    if (x < 0)
+      return 0;
+    if (x > size-1)
+      return 0;
+    int x0 = x;
     int x1 = min(size-1, x0 + 1);
     float d = x - x0;
-    return __ldg(coeffs+x0) + d * (__ldg(coeffs + x1) - __ldg(coeffs + x0));
+    float f0 = __ldg(coeffs + x0);
+    float f1 = __ldg(coeffs + x1);
+    return f0 + d * (f1 - f0);
   }
 };
 
