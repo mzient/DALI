@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef DALI_KERNELS_TEST_KERNEL_MAT2TENSOR_H_
-#define DALI_KERNELS_TEST_KERNEL_MAT2TENSOR_H_
+#ifndef DALI_KERNELS_TEST_MAT2TENSOR_H_
+#define DALI_KERNELS_TEST_MAT2TENSOR_H_
 
 #include <gtest/gtest.h>
 #include <opencv2/core.hpp>
@@ -58,4 +58,4 @@ TensorView<StorageCPU, T, ndim> view_as_tensor(cv::Mat &mat) {
 }  // namespace kernels
 }  // namespace dali
 
-#endif  // DALI_KERNELS_TEST_KERNEL_MAT2TENSOR_H_
+#endif  // DALI_KERNELS_TEST_MAT2TENSOR_H_

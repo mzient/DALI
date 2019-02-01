@@ -23,6 +23,8 @@ namespace dali {
 namespace kernels {
 
 enum ResamplingFilterType : uint8_t {
+  Nearest,
+  Linear,
   Triangular,
   Gaussian,
   Lanczos,

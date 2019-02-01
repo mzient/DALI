@@ -26,14 +26,14 @@ namespace kernels {
 template <typename Function>
 __device__ inline void InitFilter(ResamplingFilter &filter, Function F) {
   int i = threadIdx.x + blockIdx.x*blockDim.x;
-  if (i > filter.size)
+  if (i > filter.num_coeffs)
     return;
-  float x = (i - filter.anchor) * filter.scale;
-  filter.coeffs[i] = F(x);
+  filter.coeffs[i] = F(i);
 }
 
 __global__ void InitGaussianFilter(ResamplingFilter filter) {
-  InitFilter(filter, [](float x) {
+  InitFilter(filter, [&](int i) {
+    float x = 4 * (i - (filter.num_coeffs-1)*0.5f) / (filter.num_coeffs-1);
     return expf(-x*x);
   });
 }
@@ -42,11 +42,16 @@ inline __host__ __device__ float sinc(float x) {
   return x ? sinf(x * M_PI) / (x * M_PI) : 1;
 }
 
+inline __host__ __device__ float LanczosWindow(float x, float a) {
+  if (fabsf(x) >= a)
+    return 0.0f;
+  return sinc(x)*sinc(x / a);
+}
+
 __global__ void InitLanczosFilter(ResamplingFilter filter, float a) {
-  InitFilter(filter, [a](float x) {
-    if (fabsf(x) >= a)
-      return 0.0f;
-    return sinc(x)*sinc(x / a);
+  InitFilter(filter, [&](int i) {
+    float x = 2 * a * (i - (filter.num_coeffs-1)*0.5f) / (filter.num_coeffs-1);
+    return LanczosWindow(x, a);
   });
 }
 
@@ -60,15 +65,15 @@ void InitFilters(ResamplingFilters &filters, cudaStream_t stream) {
 
   filters.filter_data = memory::alloc_unique<float>(AllocType::GPU, total_size);
 
-  auto add_filter = [&](int size, float scale) {
+  auto add_filter = [&](int size) {
     float *base = filters.filters.empty()
         ? filters.filter_data.get()
-        : filters.filters.back().coeffs + filters.filters.back().size;
-    filters.filters.push_back({ base, size, scale, (size - 1) * 0.5f});
+        : filters.filters.back().coeffs + filters.filters.back().num_coeffs;
+    filters.filters.push_back({ base, size, 1, (size - 1) * 0.5f});
   };
-  add_filter(triangular_size, 1.0f);
-  add_filter(gaussian_size, 4.0f / gaussian_size);
-  add_filter(lanczos_size, 1.0f / lanczos_resolution);
+  add_filter(triangular_size);
+  add_filter(gaussian_size);
+  add_filter(lanczos_size);
 
   float triangle[3] = { 0, 1, 0 };
 
@@ -77,7 +82,26 @@ void InitFilters(ResamplingFilters &filters, cudaStream_t stream) {
 
   InitGaussianFilter<<<1, gaussian_size, 0, stream>>>(filters.filters[1]);
   InitLanczosFilter<<<1, lanczos_size, 0, stream>>>(filters.filters[2], lanczos_a);
+
+  filters[2].rescale((float)lanczos_size / lanczos_resolution);
 }
+
+ResamplingFilter ResamplingFilters::Gaussian(float sigma) const {
+  auto flt = filters[1];
+  flt.rescale(std::max(1.0f, 4*sigma));
+  return flt;
+}
+
+ResamplingFilter ResamplingFilters::Lanczos3() const {
+  return filters[2];
+}
+
+ResamplingFilter ResamplingFilters::Triangular(float radius) const {
+  auto flt = filters[1];
+  flt.rescale(std::max(1.0f, 2*radius + 1));
+  return flt;
+}
+
 
 static std::unordered_map<int, std::weak_ptr<ResamplingFilters>> filters;
 static std::mutex filter_mutex;

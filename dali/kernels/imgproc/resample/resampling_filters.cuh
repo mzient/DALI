@@ -23,20 +23,27 @@ namespace kernels {
 
 struct ResamplingFilter {
   float *coeffs;
-  int size;
-  float scale, anchor;
+  int num_coeffs;
+  float anchor;
+  float scale;
 
-  __device__ float at(float x) const {
-    return at_abs(x*scale + anchor);
+  __host__ __device__ void rescale(float support) {
+    float old_scale = scale;
+    scale = num_coeffs / support;
+    anchor = anchor * old_scale / scale;
+  }
+
+  __host__ __device__ int support() const {
+    return ceilf(num_coeffs / scale);
   }
 
   __device__ float at_abs(float x) const {
     if (x < 0)
       return 0;
-    if (x > size-1)
+    if (x > num_coeffs-1)
       return 0;
     int x0 = x;
-    int x1 = min(size-1, x0 + 1);
+    int x1 = min(num_coeffs-1, x0 + 1);
     float d = x - x0;
     float f0 = __ldg(coeffs + x0);
     float f1 = __ldg(coeffs + x1);
@@ -46,6 +53,10 @@ struct ResamplingFilter {
 
 struct ResamplingFilters {
   std::unique_ptr<float, std::function<void(void*)>> filter_data;
+
+  ResamplingFilter Gaussian(float sigma) const;
+  ResamplingFilter Lanczos3() const;
+  ResamplingFilter Triangular(float radius) const;
 
   std::vector<ResamplingFilter> filters;
   ResamplingFilter &operator[](int index) {

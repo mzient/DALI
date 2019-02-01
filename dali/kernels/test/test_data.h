@@ -12,21 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_IMPL_SELECT_H_
-#define DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_IMPL_SELECT_H_
+#ifndef DALI_KERNELS_TEST_TEST_DATA_H_
+#define DALI_KERNELS_TEST_TEST_DATA_H_
 
-#include "separable_large.h"
+#include <opencv2/core.hpp>
+#include "dali/kernels/span.h"
+#include "dali/kernels/test/mat2tensor.h"
 
 namespace dali {
-namespace kernels {
+namespace testing {
 
-template <typename OutputElement, typename InputElement>
-SeparableResamplingFilter<OutputElement, InputElement>::Ptr
-SeparableResamplingFilter<OutputElement, InputElement>::Create(const Params &params) {
-  return Ptr(new LargeSeparableResamplingGPU<OutputElement, InputElement>());
-}
+namespace data {
+  span<uint8_t> file(const char *name);
+  const cv::Mat &image(const char *name);
+}  // namespace data
 
-} // kernels
-} // dali
+}  // namespace testing
+}  // namespace dali
 
-#endif  // DALI_KERNELS_IMGPROC_RESAMPLE_SEPARABLE_IMPL_SELECT_H_
+#endif  // DALI_KERNELS_TEST_TEST_DATA_H_

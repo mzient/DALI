@@ -22,6 +22,12 @@
 namespace dali {
 namespace kernels {
 
+constexpr int ResampleSharedMemSize = 32<<10;
+
+namespace resample_shared {
+  extern __shared__ float coeffs[];
+};
+
 /// @brief Implements horizontal resampling for a custom ROI
 /// @param x0 - start column, in output coordinates
 /// @param x1 - end column (exclusive), in output coordinates
@@ -38,22 +44,20 @@ __device__ void ResampleHorz(
     float src_x0, float scale,
     Dst *out, int out_stride,
     const Src *in, int in_stride, int in_w, int channels,
-    ResamplingFilter filter, int support, int offset) {
-
-  src_x0 += 0.5f * scale - 0.5f;
+    ResamplingFilter filter, int support) {
+  using resample_shared::coeffs;
+  src_x0 += 0.5f * scale - 0.5f - filter.anchor;
 
   const float filter_step = filter.scale;
-  const float filter_ofs = filter.anchor + offset * filter_step;
 
   const int MAX_CHANNELS = 8;
-  __shared__ float coeffs[32*256];
   const int coeff_base = support*threadIdx.x;
 
   for (int j = x0; j < x1; j+=blockDim.x) {
     int dx = j + threadIdx.x;
-    const float sx0f = dx * scale + src_x0 + offset;
-    const int sx0 = floorf(sx0f);
-    float f = (sx0 - sx0f) * filter_step + filter_ofs;
+    const float sx0f = dx * scale + src_x0;
+    const int sx0 = ceilf(sx0f);
+    float f = (sx0 - sx0f) * filter_step;
     for (int k = threadIdx.y; k < support; k += blockDim.y) {
       float flt = filter.at_abs(f + k*filter_step);
       coeffs[coeff_base + k] = flt;
@@ -110,22 +114,21 @@ __device__ void ResampleVert(
     float src_y0, float scale,
     Dst *out, int out_stride,
     const Src *in, int in_stride, int in_h, int channels,
-    ResamplingFilter filter, int support, int offset) {
+    ResamplingFilter filter, int support) {
+  using resample_shared::coeffs;
 
-  src_y0 += 0.5f * scale - 0.5f;
+  src_y0 += 0.5f * scale - 0.5f - filter.anchor;
 
   const float filter_step = filter.scale;
-  const float filter_ofs = filter.anchor + offset * filter_step;
 
   const int MAX_CHANNELS = 8;
-  __shared__ float coeffs[32*256];
   const int coeff_base = support*threadIdx.y;
 
   for (int i = y0; i < y1; i+=blockDim.y) {
     int dy = i + threadIdx.y;
-    const float sy0f = dy * scale + src_y0 + offset;
-    const int sy0 = floorf(sy0f);
-    float f = (sy0 - sy0f) * filter.scale + filter_ofs;
+    const float sy0f = dy * scale + src_y0;
+    const int sy0 = ceilf(sy0f);
+    float f = (sy0 - sy0f) * filter_step;
     for (int k = threadIdx.x; k < support; k += blockDim.x) {
       float flt = filter.at_abs(f + k*filter_step);
       coeffs[coeff_base + k] = flt;

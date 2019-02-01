@@ -37,7 +37,7 @@ TEST(ResamplingFilters, PrintFilters) {
   auto filters = GetResamplingFilters(0);
   ASSERT_NE(filters, nullptr);
   for (auto &f : filters->filters) {
-    int size = f.size;
+    int size = f.num_coeffs;
     auto mem = memory::alloc_unique<float>(AllocType::GPU, size);
     GetFilterValues<<<1, size>>>(mem.get(), f, size, 1);
     std::vector<float> host(size);
