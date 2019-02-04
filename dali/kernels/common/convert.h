@@ -18,6 +18,7 @@
 #include <cuda_runtime.h>
 #include <limits>
 #include <type_traits>
+#include <cstdint>
 
 namespace dali {
 namespace kernels {

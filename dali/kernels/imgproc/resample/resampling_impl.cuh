@@ -16,13 +16,16 @@
 #define DALI_KERNELS_IMGPROC_RESAMPLE_RESAMPLING_IMPL_CUH_
 
 #include <cuda_runtime.h>
-#include "dali/kernels/imgproc/resample/resampling_filters.cuh"
+#include "dali/kernels/static_switch.h"
 #include "dali/kernels/common/convert.h"
+#include "dali/kernels/imgproc/resample/resampling_filters.cuh"
 
 namespace dali {
 namespace kernels {
 
 constexpr int ResampleSharedMemSize = 32<<10;
+
+namespace {
 
 namespace resample_shared {
   extern __shared__ float coeffs[];
@@ -38,31 +41,36 @@ namespace resample_shared {
 /// Block horizontal size is warp-aligned.
 /// Filter coefficients are pre-calculated for each vertical span to avoid
 /// recalculating them for each row, and stored in a shared memory block.
-template <typename Dst, typename Src>
-__device__ void ResampleHorz(
+template <int static_channels = -1, typename Dst, typename Src>
+__device__ void ResampleHorz_Channels(
     int x0, int x1, int y0, int y1,
     float src_x0, float scale,
     Dst *out, int out_stride,
-    const Src *in, int in_stride, int in_w, int channels,
+    const Src *in, int in_stride, int in_w, int dynamic_channels,
     ResamplingFilter filter, int support) {
   using resample_shared::coeffs;
+
   src_x0 += 0.5f * scale - 0.5f - filter.anchor;
 
   const float filter_step = filter.scale;
 
   const int MAX_CHANNELS = 8;
-  const int coeff_base = support*threadIdx.x;
+  const int coeff_base = threadIdx.x;
+  const int coeff_stride = blockDim.x;
+  const int channels = static_channels < 0 ? dynamic_channels : static_channels;
+
+  const float bias = std::is_integral<Dst>::value ? 0.5f : 0;
 
   for (int j = x0; j < x1; j+=blockDim.x) {
     int dx = j + threadIdx.x;
     const float sx0f = dx * scale + src_x0;
     const int sx0 = ceilf(sx0f);
     float f = (sx0 - sx0f) * filter_step;
+    __syncthreads();
     for (int k = threadIdx.y; k < support; k += blockDim.y) {
       float flt = filter.at_abs(f + k*filter_step);
-      coeffs[coeff_base + k] = flt;
+      coeffs[coeff_base + coeff_stride*k] = flt;
     }
-
     __syncthreads();
 
     if (dx >= x1)
@@ -70,7 +78,7 @@ __device__ void ResampleHorz(
 
     float norm = 0;
     for (int k = 0; k < support; k++) {
-      norm += coeffs[coeff_base + k];
+      norm += coeffs[coeff_base + coeff_stride * k];
     }
     norm = 1.0f / norm;
 
@@ -78,19 +86,18 @@ __device__ void ResampleHorz(
       const Src *in_row = &in[i * in_stride];
       Dst *out_row = &out[i * out_stride];
 
-      float tmp[MAX_CHANNELS];
+      float tmp[static_channels < 0 ? MAX_CHANNELS : static_channels];
       for (int c = 0; c < channels; c++)
-        tmp[c] = 0;
+        tmp[c] = bias;
 
-      for (int k = 0; k < support; k++) {
+      for (int k = 0, coeff_idx=coeff_base; k < support; k++, coeff_idx += coeff_stride) {
         int x = sx0 + k;
         int xsample = x < 0 ? 0 : x >= in_w-1 ? in_w-1 : x;
-        float flt = coeffs[coeff_base + k];
+        float flt = coeffs[coeff_idx];
         for (int c = 0; c < channels; c++) {
           Src px = __ldg(in_row + channels * xsample + c);
           tmp[c] += px * flt;
         }
-        f += filter_step;
       }
 
       for (int c = 0; c < channels; c++)
@@ -108,12 +115,12 @@ __device__ void ResampleHorz(
 /// The function fills the output in block-sized horizontal spans.
 /// Filter coefficients are pre-calculated for each horizontal span to avoid
 /// recalculating them for each column, and stored in a shared memory block.
-template <typename Dst, typename Src>
-__device__ void ResampleVert(
+template <int static_channels = -1, typename Dst, typename Src>
+__device__ void ResampleVert_Channels(
     int x0, int x1, int y0, int y1,
     float src_y0, float scale,
     Dst *out, int out_stride,
-    const Src *in, int in_stride, int in_h, int channels,
+    const Src *in, int in_stride, int in_h, int dynamic_channels,
     ResamplingFilter filter, int support) {
   using resample_shared::coeffs;
 
@@ -123,17 +130,20 @@ __device__ void ResampleVert(
 
   const int MAX_CHANNELS = 8;
   const int coeff_base = support*threadIdx.y;
+  const int channels = static_channels < 0 ? dynamic_channels : static_channels;
+
+  const float bias = std::is_integral<Dst>::value ? 0.5f : 0;
 
   for (int i = y0; i < y1; i+=blockDim.y) {
     int dy = i + threadIdx.y;
     const float sy0f = dy * scale + src_y0;
     const int sy0 = ceilf(sy0f);
     float f = (sy0 - sy0f) * filter_step;
+    __syncthreads();
     for (int k = threadIdx.x; k < support; k += blockDim.x) {
       float flt = filter.at_abs(f + k*filter_step);
       coeffs[coeff_base + k] = flt;
     }
-
     __syncthreads();
 
     if (dy >= y1)
@@ -151,9 +161,9 @@ __device__ void ResampleVert(
       Dst *out_col = &out_row[j * channels];
       const Src *in_col = &in[j * channels];
 
-      float tmp[MAX_CHANNELS];
+      float tmp[static_channels < 0 ? MAX_CHANNELS : static_channels];
       for (int c = 0; c < channels; c++)
-        tmp[c] = 0;
+        tmp[c] = bias;
 
       for (int k = 0; k < support; k++) {
         int y = sy0 + k;
@@ -163,7 +173,6 @@ __device__ void ResampleVert(
           Src px = __ldg(in_col + in_stride * ysample + c);
           tmp[c] += px * flt;
         }
-        f += filter_step;
       }
 
       for (int c = 0; c < channels; c++)
@@ -172,6 +181,57 @@ __device__ void ResampleVert(
   }
 }
 
+}  // namespace
+
+template <typename Dst, typename Src>
+__device__ void ResampleHorz(
+    int x0, int x1, int y0, int y1,
+    float src_x0, float scale,
+    Dst *out, int out_stride,
+    const Src *in, int in_stride, int in_w, int channels,
+    ResamplingFilter filter, int support) {
+  // Specialize over commnon numbers of channels.
+  // Ca. 30% speedup compared to generic code path for
+  // three channel image with large kernel.
+  VALUE_SWITCH(channels, static_channels, (1, 2, 3, 4),
+  (
+    ResampleHorz_Channels<static_channels>(
+      x0, x1, y0, y1, 0, scale,
+      out, out_stride, in, in_stride, in_w,
+      static_channels, filter, support);
+  ),  // NOLINT
+  (
+    ResampleHorz_Channels<-1>(
+      x0, x1, y0, y1, 0, scale,
+      out, out_stride, in, in_stride, in_w,
+      channels, filter, support);
+  ));  // NOLINT
+}
+
+template <typename Dst, typename Src>
+__device__ void ResampleVert(
+    int x0, int x1, int y0, int y1,
+    float src_y0, float scale,
+    Dst *out, int out_stride,
+    const Src *in, int in_stride, int in_h, int channels,
+    ResamplingFilter filter, int support) {
+  // Specialize over commnon numbers of channels.
+  // Ca. 30% speedup compared to generic code path for
+  // three channel image with large kernel.
+  VALUE_SWITCH(channels, static_channels, (1, 2, 3, 4),
+  (
+    ResampleVert_Channels<static_channels>(
+      x0, x1, y0, y1, 0, scale,
+      out, out_stride, in, in_stride, in_h,
+      static_channels, filter, support);
+  ),  // NOLINT
+  (
+    ResampleVert_Channels<-1>(
+      x0, x1, y0, y1, 0, scale,
+      out, out_stride, in, in_stride, in_h,
+      channels, filter, support);
+  ));  // NOLINT
+}
 
 }  // namespace kernels
 }  // namespace dali

@@ -128,8 +128,8 @@
 ///   ), assert(!"Unsupported number of channels");
 /// )
 /// ```
-#define VALUE_SWITCH(value_, value_name_, values, case_, default_) switch (value_) { \
-    BOOST_PP_SEQ_FOR_EACH(DALI_VALUE_SWITCH_IMPL, (value_name_, case_), \
+  #define VALUE_SWITCH(value_, value_name_, values, case_, default_) switch (value_) { \
+      BOOST_PP_SEQ_FOR_EACH(DALI_VALUE_SWITCH_IMPL, (value_name_, case_), \
                           BOOST_PP_VARIADIC_TO_SEQ(DALI_REMOVE_PAREN(values))) \
   default: \
   { BOOST_PP_REMOVE_PARENS(default_); } \

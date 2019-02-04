@@ -38,7 +38,7 @@ struct ResamplingFilter {
   }
 
   __device__ float at_abs(float x) const {
-    if (x < 0)
+    if (!(x >= 0))
       return 0;
     if (x > num_coeffs-1)
       return 0;

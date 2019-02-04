@@ -84,6 +84,7 @@ void InitFilters(ResamplingFilters &filters, cudaStream_t stream) {
   InitLanczosFilter<<<1, lanczos_size, 0, stream>>>(filters.filters[2], lanczos_a);
 
   filters[2].rescale((float)lanczos_size / lanczos_resolution);
+  cudaStreamSynchronize(stream);
 }
 
 ResamplingFilter ResamplingFilters::Gaussian(float sigma) const {
