@@ -11,6 +11,7 @@ test_body() {
     nosetests --verbose test_backend_impl.py
     nosetests --verbose test_pipeline.py
     nosetests --verbose test_plugin_manager.py
+    nosetests --verbose test_nvjpeg_cache.py
 
     python test_detection_pipeline.py -i 300
     python test_RN50_data_pipeline.py -i 10
