@@ -61,12 +61,12 @@ struct SeparableResamplingGPUImpl : Interface {
     ScratchpadEstimator se;
 
     // Sample descriptions need to be delivered to the GPU - hence, the storage
-    se.add<SampleDesc>(AllocType::GPU, setup.sample_descs.size());
+    se.add<SampleDesc>(AllocType::Unified, setup.sample_descs.size());
 
     // CPU block2sample lookup may change in size and is large enough
     // to mandate declaring it as a requirement for external allocator.
     size_t num_blocks = setup.total_blocks.pass[0] + setup.total_blocks.pass[1];
-    se.add<SampleBlockInfo>(AllocType::GPU, num_blocks);
+    se.add<SampleBlockInfo>(AllocType::Unified, num_blocks);
     se.add<SampleBlockInfo>(AllocType::Host, num_blocks);
 
     // Request memory for intermediate storage.
@@ -98,27 +98,27 @@ struct SeparableResamplingGPUImpl : Interface {
     cudaStream_t stream = context.gpu.stream;
 
     SampleDesc *descs_gpu = context.scratchpad->Allocate<SampleDesc>(
-        AllocType::GPU, setup.sample_descs.size());
+        AllocType::Unified, setup.sample_descs.size());
+    memcpy(descs_gpu, setup.sample_descs.data(), setup.sample_descs.size()*sizeof(SampleDesc));
+    int dev = 0;
+    cudaGetDevice(&dev);
 
     int total_blocks = setup.total_blocks.pass[0] + setup.total_blocks.pass[1];
 
-    OutTensorCPU<SampleBlockInfo, 1> sample_lookup_cpu = {
-      context.scratchpad->Allocate<SampleBlockInfo>(AllocType::Host, total_blocks),
+    TensorView<StorageCPU, SampleBlockInfo, 1> sample_lookup_cpu = {
+      context.scratchpad->Allocate<SampleBlockInfo>(AllocType::Unified, total_blocks),
       { total_blocks }
     };
-    OutTensorGPU<SampleBlockInfo, 1> sample_lookup_gpu = {
-      context.scratchpad->Allocate<SampleBlockInfo>(AllocType::GPU, total_blocks),
-      { total_blocks }
-    };
+    TensorView<StorageGPU, SampleBlockInfo, 1> sample_lookup_gpu =
+      make_tensor_gpu(sample_lookup_cpu.data, sample_lookup_cpu.shape);
     setup.InitializeSampleLookup(sample_lookup_cpu);
-    copy(sample_lookup_gpu, sample_lookup_cpu, stream);  // NOLINT (it thinks it's std::copy)
 
-    cudaMemcpyAsync(
+    /*cudaMemcpyAsync(
         descs_gpu,
         setup.sample_descs.data(),
         setup.sample_descs.size()*sizeof(SampleDesc),
         cudaMemcpyHostToDevice,
-        stream);
+        stream);*/
 
     InTensorGPU<SampleBlockInfo, 1> first_pass_lookup = make_tensor_gpu<1>(
         sample_lookup_gpu.data,
@@ -135,6 +135,7 @@ struct SeparableResamplingGPUImpl : Interface {
       intermediate, in, descs_gpu, first_pass_lookup, stream);
     RunPass<1, OutputElement, IntermediateElement>(
       out, intermediate, descs_gpu, second_pass_lookup, stream);
+
   }
 };
 

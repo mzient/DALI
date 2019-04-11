@@ -17,6 +17,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <random>
+#include <chrono>
 #include "dali/kernels/imgproc/resample/separable.h"
 #include "dali/kernels/test/test_tensors.h"
 #include "dali/kernels/test/tensor_test_utils.h"
@@ -320,6 +321,110 @@ TEST_P(BatchResamplingTest, ResamplingKernelAPI) {
     }();
   }
 }
+
+
+TEST_P(BatchResamplingTest, Perf) {
+  const ResamplingTestBatch &batch = GetParam();
+
+  int N = batch.size();
+  std::vector<cv::Mat> cv_img(N);
+  std::vector<cv::Mat> cv_ref(N);
+  std::vector<ResamplingParams2D> params(N);
+
+  for (int i = 0; i < N; i++) {
+    cv_img[i] = testing::data::image(batch[i].input.c_str());
+    cv_ref[i] = testing::data::image(batch[i].reference.c_str());
+    params[i] = batch[i].params;
+  }
+
+  ScratchpadAllocator scratch_alloc;
+  KernelContext ctx;
+  cudaStream_t stream;
+  ASSERT_EQ(cudaSuccess, cudaStreamCreate(&stream));
+
+  ctx.gpu.stream = stream;
+  using Kernel = ResampleGPU<uint8_t, uint8_t>;
+  TestTensorList<uint8_t, 3> input, output;
+
+  FilterDesc tri;
+  tri.type = ResamplingFilterType::Triangular;
+  FilterDesc lanczos;
+  lanczos.type = ResamplingFilterType::Lanczos3;
+
+  std::vector<TensorShape<3>> shapes;
+  for (int i = 0; i < N; i++) {
+    shapes.push_back(tensor_shape<3>(cv_img[i]));
+  }
+  input.reshape(shapes);
+  OutListGPU<uint8_t, 3> in_tv = input.gpu();
+  for (int i = 0; i < N; i++) {
+    copy(in_tv[i], view_as_tensor<uint8_t, 3>(cv_img[i]));
+  }
+
+  cudaStreamSynchronize(stream);
+  int iters = 10000;
+  using perf_timer = std::chrono::high_resolution_clock;
+  auto start = perf_timer::now();
+  for (int iter = 0; iter < iters; iter++) {
+    if (iter == 1) {
+      cudaStreamSynchronize(stream);
+      start = perf_timer::now();
+    }
+
+    auto req = Kernel::GetRequirements(ctx, in_tv, make_span(params));
+    ASSERT_EQ(req.output_shapes.size(), 1);
+    ASSERT_EQ(req.output_shapes[0].num_samples(), N);
+
+    if (iter == 0) {
+      scratch_alloc.Reserve(req.scratch_sizes);
+      output.reshape(req.output_shapes[0].to_static<3>());
+    }
+    OutListGPU<uint8_t, 3> out_tv = output.gpu();
+
+    for (int i = 0; i < N; i++) {
+      TensorShape<3> expected_shape = {
+        params[i][0].output_size,
+        params[i][1].output_size,
+        in_tv.shape.tensor_shape_span(i)[2]
+      };
+      ASSERT_EQ(req.output_shapes[0].tensor_shape(i), expected_shape);
+    }
+
+    auto scratchpad = scratch_alloc.GetScratchpad();
+    ctx.scratchpad = &scratchpad;
+    Kernel::Run(ctx, out_tv, in_tv, make_span(params));
+  }
+  cudaStreamSynchronize(stream);
+  auto end = perf_timer::now();
+  std::cout << "Time: " << std::chrono::duration_cast<std::chrono::microseconds>(end-start).count()
+            << "us" << std::endl;
+
+  cudaStreamDestroy(stream);
+  stream = 0;
+
+  for (int i = 0; i < N; i++) {
+    auto ref_tensor = view_as_tensor<uint8_t, 3>(cv_ref[i]);
+    auto out_tensor = output.cpu()[i];
+    ASSERT_NO_FATAL_FAILURE(Check(out_tensor, ref_tensor, EqualEps(batch[i].epsilon)))
+    << [&]() {
+      cv::Mat tmp(out_tensor.shape[0], out_tensor.shape[1], CV_8UC3, out_tensor.data);
+      std::string inp_name = batch[i].input;
+      int ext = inp_name.rfind('.');
+#ifdef WINVER
+      constexpr char sep = '\\';
+#else
+      constexpr char sep = '/';
+#endif
+      int start = inp_name.rfind(sep) + 1;
+      std::string dif_name = inp_name.substr(start, ext - start) + "_dif"+inp_name.substr(ext);
+      std::string out_name = inp_name.substr(start, ext - start) + "_out"+inp_name.substr(ext);
+      cv::imwrite(dif_name, 127 + tmp - cv_ref[i]);
+      cv::imwrite(out_name, tmp);
+      return "Diff written to " + dif_name;
+    }();
+  }
+}
+
 
 INSTANTIATE_TEST_SUITE_P(SingleImage, BatchResamplingTest, ::testing::Values(SingleImageBatch));
 INSTANTIATE_TEST_SUITE_P(MultipleImages, BatchResamplingTest, ::testing::Values(Batch1));
