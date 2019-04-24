@@ -42,6 +42,19 @@ struct check_compatible_ndim {
     "Must be equal or at least one side must be DynamicDimensions");
 };
 
+constexpr int infer_out_dim_unchecked(int out_dim, int in_dim) {
+  return out_dim == InferDimensions ? in_dim : out_dim;
+}
+
+template <int out_dim, int in_dim>
+struct inferred_out_dim : std::integral_constant<int, infer_out_dim_unchecked(out_dim, in_dim)> {
+  static_assert(out_dim == in_dim || out_dim < 0 || in_dim < 0,
+    "Cannot change a static number of dimensions");
+};
+
+#define INFER_OUT_DIM(out_dim, in_dim) \
+dali::kernels::detail::inferred_out_dim<(out_dim), (in_dim)>::value
+
 }  // namespace detail
 
 

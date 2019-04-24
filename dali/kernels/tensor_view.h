@@ -110,6 +110,8 @@ struct TensorViewBase {
   using element_type = DataType;
   int dim() const { return shape.size(); }
 
+  static constexpr int compile_time_ndim = ndim;
+
   /// @brief Utility to calculate pointer to element at given coordinates
   template <typename... Indices>
   DataType *operator()(int64_t idx0, Indices &&... idx) const {
@@ -139,6 +141,9 @@ struct TensorViewBase {
   TensorViewBase(DataType *data, const TensorShape<ndim> &shape) : data(data), shape(shape) {}
   TensorViewBase(DataType *data, TensorShape<ndim> &&shape) : data(data), shape(std::move(shape)) {}
 };
+
+template <typename Backend, typename DataType, int ndim>
+constexpr int TensorViewBase<Backend, DataType, ndim>::compile_time_ndim;
 
 /// @brief Dynamic TensorView can be constructed from any Static TensorView
 template <typename Backend, typename DataType>
@@ -246,6 +251,8 @@ struct TensorListView;
 template <typename Backend, typename DataType, int sample_ndim>
 struct TensorListViewBase {
   using element_type = DataType;
+
+  static constexpr int compile_time_sample_dim = sample_ndim;
 
   /// @brief Return non-owning View to sample at specified index
   TensorView<Backend, DataType, sample_ndim> operator[](int sample) const {
@@ -396,6 +403,9 @@ struct TensorListViewBase {
     calculate_pointers(this->data, data, this->shape);
   }
 };
+
+template <typename Backend, typename DataType, int sample_ndim>
+constexpr int TensorListViewBase<Backend, DataType, sample_ndim>::compile_time_sample_dim;
 
 template <typename Backend, typename DataType>
 struct TensorListView<Backend, DataType, DynamicDimensions>
@@ -636,11 +646,10 @@ void sample_range(TensorListView<StorageBackend, DataType, out_ndim> &out_slice,
 /// @param begin      index of the first sample to include in the subrange
 /// @param end        index one past the last sample to include in the subrange
 /// @return `TensorListView<out_ndim>` consisting of samples at indices `begin` to `end` - 1
-template <int out_ndim = InferDimensions, typename StorageBackend, typename DataType, int ndim,
-  int output_ndim = (out_ndim == InferDimensions ? ndim : out_ndim)>
-TensorListView<StorageBackend, DataType, output_ndim> sample_range(
+template <int out_ndim = InferDimensions, typename StorageBackend, typename DataType, int ndim>
+TensorListView<StorageBackend, DataType, INFER_OUT_DIM(out_ndim, ndim)> sample_range(
     const TensorListView<StorageBackend, DataType, ndim> &input, int begin, int end) {
-  TensorListView<StorageBackend, DataType, output_ndim> out_slice;
+  TensorListView<StorageBackend, DataType, INFER_OUT_DIM(out_ndim, ndim)> out_slice;
   sample_range(out_slice, input, begin, end);
   return out_slice;
 }

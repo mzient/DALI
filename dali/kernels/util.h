@@ -23,6 +23,19 @@ namespace dali {
 
 using std::size_t;
 
+// General type helpers
+
+template <typename T>
+using remove_ref_t = typename std::remove_reference<T>::type;
+
+template <typename T>
+using remove_cv_t = typename std::remove_cv<T>::type;
+
+template <typename T>
+using remove_cv_ref_t = remove_cv_t<remove_ref_t<T>>;
+
+// Collection manipulation and querying
+
 template <typename Target, typename Source>
 void append(Target &target, const Source &source) {
   target.insert(std::end(target), std::begin(source), std::end(source));
@@ -43,6 +56,7 @@ constexpr Value align_up(Value v, Alignment a) {
   return v + ((a - 1) & -v);
 }
 
+// Aligned division
 
 constexpr int32_t div_ceil(int32_t total, uint32_t grain) {
   return (total + grain - 1) / grain;
@@ -69,8 +83,9 @@ static_assert(align_up(17, 16) == 32, "Should align up");
 static_assert(align_up(8, 8) == 8, "Should be already aligned");
 static_assert(align_up(5, 8) == 8, "Should align");
 
+// Collection traits
 
-template <typename DependentName, typename Result>
+template <typename DependentName, typename Result = void>
 using if_istype = typename std::conditional<false, DependentName, Result>::type;
 
 template <typename Collection, typename T = void>
