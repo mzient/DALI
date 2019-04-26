@@ -51,6 +51,11 @@ size_t size(const T (&a)[N]) {
   return N;
 }
 
+template <typename Collection>
+constexpr bool empty(const Collection &c) {
+  return std::begin(c) == std::end(c);
+}
+
 template <typename Value, typename Alignment>
 constexpr Value align_up(Value v, Alignment a) {
   return v + ((a - 1) & -v);

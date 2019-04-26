@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include "dali/kernels/tensor_view.h"
+#include "dali/kernels/range_check.h"
 
 namespace dali {
 namespace kernels {
@@ -33,12 +34,20 @@ struct is_tensor_list_view : std::false_type {};
 template <typename T, typename Backend, typename DataType, int ndim>
 struct is_tensor_list_view<T, TensorListView<Backend, DataType, ndim>> : std::true_type {};
 
+template <typename Backend1, typename Data1, int ndim1,
+          typename Backend2, typename Data2, int ndim2>
+void check_sample_dim(const TensorListView<Backend1, Data1, ndim1> &list1,
+                      const TensorListView<Backend2, Data2, ndim2> &list2) {
+    detail::check_compatible_ndim<ndim1, ndim2>();
+    if (list1.sample_dim() != list1.sample_dim())
+      throw std::logic_error("Incompatible number of dimensions");
+}
+
 template <typename Backend, typename U, typename T, int out_ndim, int in_ndim>
 void copy_sample(TensorListView<Backend, U, out_ndim> &out, int out_idx,
                  const TensorListView<Backend, T, in_ndim> &in, int in_idx) {
-  detail::check_compatible_ndim<in_ndim, out_ndim>();
+  detail::check_compatible_ndim<out_ndim, in_ndim>();
   int sample_dim = in.sample_dim();
-  assert(output.sample_dim() == sample_dim());
   for (int d = 0; d < sample_dim; d++)
     out.tensor_shape_span(out_idx)[d] = in.tensor_shape_span(in_idx)[d];
   out.data[out_idx] = in.data[in_idx];
@@ -80,9 +89,8 @@ void scatter_samples(
       TensorListView<Backend, OutData, out_ndim> &out,
       const TensorListView<Backend, InData, in_ndim> &in,
       const IndexCollection &indices) {
-  detail::check_compatible_ndim<in_ndim, out_ndim>();
+  check_sample_dim(out, in);
   int sample_dim = in.sample_dim();
-  assert(out.sample_dim() == in.sample_dim());
   assert(indices.size() <= in.num_samples());
   int i = 0;
   for (int index : indices) {
@@ -109,16 +117,15 @@ void insert_samples(
       TensorListView<Backend, OutData, out_ndim> &out,
       const TensorListView<Backend, InData, in_ndim> &in,
       const IndexPairCollection &index_out_in) {
-  detail::check_compatible_ndim<in_ndim, out_ndim>();
   int sample_dim = in.sample_dim();
-  assert(out.sample_dim() == in.sample_dim());
-  assert(indices.size() <= in.num_samples());
+  check_sample_dim(out, in);
+  range_check(size(index_out_in), 0, in.num_samples()+1);
   int i = 0;
   for (auto index_pair : index_out_in) {
     int out_idx = index_pair.first;
     int in_idx = index_pair.second;
-    assert(out_idx >= 0 && out_idx < out.num_samples());
-    assert(in_idx >= 0 && in_idx < in.num_samples());
+    range_check(out_idx, 0, out.num_samples());
+    range_check(in_idx, 0, in.num_samples());
     copy_sample(out, out_idx, in, in_idx);
   }
 }
@@ -151,11 +158,41 @@ gather_samples(
   for (auto index_pair : list_and_sample_indices) {
     int list_idx = index_pair.first;
     int sample_idx = index_pair.first;
-    assert(list_idx >= 0 && list_idx < num_lists);
+    range_check(list_idx, 0, num_lists);
     auto &list = in_lists[list_idx];
-    assert(list.sample_dim() == sample_dim);
-    assert(sample_idx >= 0 && sample_idx <list.num_samples());
+    check_sample_dim(out, list);
+    range_check(sample_idx, 0, list.num_samples());
     copy_sample(out, i++, list, sample_idx);
+  }
+}
+
+
+/// @brief Fills output with samples selected from multiple inputs
+/// @param out        output tensor list
+/// @param in_lists   an indexable collection of tensor lists
+/// @param list_and_sample_indices  a collection of pairs (list_index, sample_index);
+///        its elements must have fields `first` and `second`, implicitly convertible to `int'
+template <typename Backend, typename OutLists,
+          typename InData, int in_ndim, typename IndexPairCollection>
+typename std::enable_if<is_tensor_list_view<decltype(std::declval<OutLists>()[0])>::value>::type
+scatter_samples(
+      const OutLists &out_lists,
+      const TensorListView<Backend, InData, in_ndim> &in,
+      const IndexPairCollection &list_and_sample_indices) {
+  const int out_ndim = remove_ref_t<decltype(out_lists[0])>::compile_time_sample_dim;
+  detail::check_compatible_ndim<in_ndim, out_ndim>();
+  range_check(size(list_and_sample_indices), 0, in.num_samples() + 1);
+  int num_lists = size(out_lists);
+  int num_samples = in.num_samples();
+  int i = 0;
+  for (auto index_pair : list_and_sample_indices) {
+    int list_idx = index_pair.first;
+    int sample_idx = index_pair.first;
+    range_check(list_idx, 0, num_lists);
+    auto &list = out_lists[list_idx];
+    check_sample_dim(list, in);
+    range_check(sample_idx, 0, list.num_samples());
+    copy_sample(list, sample_idx, in, i++);
   }
 }
 
@@ -198,7 +235,6 @@ TensorListView<Backend, DataType, out_ndim> mask_gather(
   return out;
 }
 
-
 template <typename Backend,
           typename DataOut,
           int out_ndim,
@@ -209,14 +245,14 @@ void mask_insert(
       TensorListView<Backend, DataOut, out_ndim> &out,
       const TensorListView<Backend, DataIn, in_ndim> &in,
       const IterableBitMask &mask) {
-  detail::check_compatible_ndim<in_ndim, out_ndim>();
+  check_sample_dim(out, in);
   int sample_dim = in.sample_dim();
   int in_idx = 0;
   int out_idx = 0;
   for (auto m : mask) {
     if (m) {
-      assert(in_idx < in.num_samples());
-      assert(out_idx < out.num_samples());
+      check_range(in_idx, 0, in.num_samples());
+      check_range(out_idx, 0, out.num_samples());
       copy_sample(out, out_idx, in, in_idx);
       in_idx++;
     }
@@ -225,26 +261,42 @@ void mask_insert(
 }
 
 
-/*template <int out_ndim = typename Backend>
-TensorListView<Backend, DataType, output_ndim> concat(
-  const TensorListView<Backend, DataType, ndim> &in,
-  const IterableBitMask &mask) {
-  int sample_dim = in.sample_dim();
-  TensorListView<Backend, DataType, output_ndim> out;
-  int nonzero = 0;
-  for (bool m : mask) {
-    if (m) nonzero++;
-  }
-  out.resize(nonzero, sample_dim);
-  int i = 0, j = 0;
-  for (bool m : mask) {
-    if (m)
-      copy_sample(out, j++, in, i);
-    i++;
-  }
-  return out;
-}*/
+template <typename Backend, typename OutData, int out_ndim, typename InLists>
+void concat(
+      TensorListView<Backend, OutData, out_ndim> &out,
+      const InLists &in_lists) {
+  const int in_ndim = remove_ref_t<decltype(in_lists[0])>::compile_time_sample_dim;
+  detail::check_compatible_ndim<in_ndim, out_ndim>();
 
+  int sample_dim = -1;
+  int total_samples = 0;
+  for (auto &list : in_lists) {
+    if (list.empty())
+      continue;
+    int d = list.sample_dim();
+    if (sample_dim < 0)
+      sample_dim = d;
+    else if (sample_dim != d)
+      throw std::logic_error("Input contains lists of different dimensionality");
+    total_samples += list.num_samples();
+  }
+
+  if (total_samples == 0) {
+    out.resize(0);
+    return;
+  }
+
+  int i = 0;
+
+  for (auto &list : in_lists) {
+    if (list.empty())
+      continue;
+    int n = list.num_samples();
+    for (int j = 0; j < n; j++)
+      copy_sample(out, i+j, list, j);
+    i += n;
+  }
+}
 
 }  // namespace kernels
 }  // namespace dali

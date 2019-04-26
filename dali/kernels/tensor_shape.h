@@ -512,7 +512,7 @@ struct TensorListShapeBase {
 
   void resize(int num_samples, int dim) {
     set_sample_dim(dim);
-    shapes.resize(num_samples * sample_ndim);
+    shapes.resize(num_samples * dim);
   }
 
  protected:
