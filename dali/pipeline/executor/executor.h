@@ -320,8 +320,7 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunCPU() {
             OperatorBase &op = *op_node.op;
             WorkspacePolicy::template GetWorkspace<OpType::CPU>(cpu_idxs, *graph_, op_node)
                 .GetSample(&ws, data_idx, tid);
-            TimeRange tr("[Executor] Run CPU op " + op_node.instance_name
-                + " on " + to_string(data_idx),
+            TimeRange tr("[Executor] Run CPU op " + op_node.instance_name,
                 TimeRange::kBlue1);
             op.Run(&ws);
           }
