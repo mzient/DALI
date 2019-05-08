@@ -356,12 +356,17 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunMixed() {
       OperatorBase &op = *op_node.op;
       typename WorkspacePolicy::template ws_t<OpType::MIXED> ws =
           WorkspacePolicy::template GetWorkspace<OpType::MIXED>(mixed_idxs, *graph_, i);
+      if (ws.has_stream())
+        cudaStreamSynchronize(ws.stream());
+
       TimeRange tr("[Executor] Run Mixed op " + op_node.instance_name,
           TimeRange::kOrange);
       op.Run(&ws);
       if (ws.has_stream() && ws.has_event()) {
         CUDA_CALL(cudaEventRecord(ws.event(), ws.stream()));
       }
+      if (ws.has_stream())
+        cudaStreamSynchronize(ws.stream());
     }
   } catch (std::runtime_error &e) {
     exec_error_ = true;
@@ -413,12 +418,16 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunGPU() {
         CUDA_CALL(cudaStreamWaitEvent(ws.stream(), event, 0));
       }
 
+      if (ws.has_stream())
+        cudaStreamSynchronize(ws.stream());
       TimeRange tr("[Executor] Run GPU op " + op_node.instance_name,
           TimeRange::knvGreen);
       op.Run(&ws);
       if (ws.has_event()) {
         CUDA_CALL(cudaEventRecord(ws.event(), ws.stream()));
       }
+      if (ws.has_stream())
+        cudaStreamSynchronize(ws.stream());
     }
 
     // TODO(klecki): do not go over string names, please
