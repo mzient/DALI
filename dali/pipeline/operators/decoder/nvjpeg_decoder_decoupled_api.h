@@ -21,6 +21,8 @@
 #include <utility>
 #include <vector>
 #include <memory>
+#include <numeric>
+#include <atomic>
 #include "dali/pipeline/operators/operator.h"
 #include "dali/pipeline/operators/decoder/nvjpeg_helper.h"
 #include "dali/pipeline/operators/decoder/cache/cached_decoder_impl.h"
@@ -28,6 +30,7 @@
 #include "dali/util/ocv.h"
 #include "dali/image/image_factory.h"
 #include "dali/pipeline/util/thread_pool.h"
+#include "dali/util/device_guard.h"
 
 namespace dali {
 
@@ -48,11 +51,12 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     decoder_huff_hybrid_state_(batch_size_),
     output_shape_(batch_size_),
     jpeg_streams_(num_threads_ * 2),
-    pinned_buffer_(num_threads_ * 2),
-    curr_pinned_buff_(num_threads_, 0),
-    device_buffer_(num_threads_),
+    pinned_buffers_(num_threads_ * 2),
+    device_buffers_(num_threads_),
+    thread_errors_(num_threads_),
     streams_(num_threads_),
-    events_(num_threads_ * 2),
+    decode_events_(num_threads_),
+    device_id_(spec.GetArgument<int>("device_id")),
     thread_pool_(num_threads_,
                  spec.GetArgument<int>("device_id"),
                  true /* pin threads */) {
@@ -89,44 +93,71 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     // GPU
     // create the handles, streams and events we'll use
     // We want to use nvJPEG default device allocator
-    for (int i = 0; i < num_threads_ * 2; ++i) {
-      NVJPEG_CALL(nvjpegJpegStreamCreate(handle_, &jpeg_streams_[i]));
-      NVJPEG_CALL(nvjpegBufferPinnedCreate(handle_, nullptr, &pinned_buffer_[i]));
-      CUDA_CALL(cudaEventCreate(&events_[i]));
+    for (auto &stream : jpeg_streams_) {
+      NVJPEG_CALL(nvjpegJpegStreamCreate(handle_, &stream));
+    }
+    for (auto &buffer : pinned_buffers_) {
+      NVJPEG_CALL(nvjpegBufferPinnedCreate(handle_, nullptr, &buffer));
+    }
+    for (auto &buffer : device_buffers_) {
+      NVJPEG_CALL(nvjpegBufferDeviceCreate(handle_, nullptr, &buffer));
     }
     for (int i = 0; i < num_threads_; ++i) {
-      NVJPEG_CALL(nvjpegBufferDeviceCreate(handle_, nullptr, &device_buffer_[i]));
-      CUDA_CALL(cudaStreamCreateWithPriority(&streams_[i], cudaStreamNonBlocking,
-                                             default_cuda_stream_priority_));
+      CUDA_CALL(cudaStreamCreateWithFlags(&streams_[i], cudaStreamNonBlocking));
+      CUDA_CALL(cudaEventCreate(&decode_events_[i]));
+      /*CUDA_CALL(cudaStreamCreateWithPriority(&streams_[i], cudaStreamNonBlocking,
+                                             default_cuda_stream_priority_));*/
     }
-    CUDA_CALL(cudaEventCreate(&master_event_));
+
+    buffer_idx_pool_.init(pinned_buffers_.size());
   }
 
-  ~nvJPEGDecoder() noexcept override {
+  ~nvJPEGDecoder() override {
     try {
       thread_pool_.WaitForWork();
-    } catch (...) {
-      // As other images being process might fail, but we don't care
+    } catch (const std::runtime_error &) {
     }
 
-    for (int i = 0; i < batch_size_; ++i) {
-      NVJPEG_CALL(nvjpegJpegStateDestroy(decoder_host_state_[i]));
-      NVJPEG_CALL(nvjpegJpegStateDestroy(decoder_huff_hybrid_state_[i]));
-    }
-    NVJPEG_CALL(nvjpegDecoderDestroy(decoder_huff_host_));
-    NVJPEG_CALL(nvjpegDecoderDestroy(decoder_huff_hybrid_));
-    for (int i = 0; i < num_threads_ * 2; ++i) {
-      NVJPEG_CALL(nvjpegJpegStreamDestroy(jpeg_streams_[i]));
-      NVJPEG_CALL(nvjpegBufferPinnedDestroy(pinned_buffer_[i]));
-      CUDA_CALL(cudaEventDestroy(events_[i]));
-    }
+    try {
+      DeviceGuard g(device_id_);
 
-    for (int i = 0; i < num_threads_; ++i) {
-      NVJPEG_CALL(nvjpegBufferDeviceDestroy(device_buffer_[i]));
-      CUDA_CALL(cudaStreamDestroy(streams_[i]));
+      for (auto &stream : streams_) {
+        CUDA_CALL(cudaStreamSynchronize(stream));
+      }
+
+      for (auto &state : decoder_host_state_) {
+        NVJPEG_CALL(nvjpegJpegStateDestroy(state));
+      }
+      for (auto &state : decoder_huff_hybrid_state_) {
+        NVJPEG_CALL(nvjpegJpegStateDestroy(state));
+      }
+      NVJPEG_CALL(nvjpegDecoderDestroy(decoder_huff_host_));
+      NVJPEG_CALL(nvjpegDecoderDestroy(decoder_huff_hybrid_));
+      for (auto &stream  : jpeg_streams_) {
+        NVJPEG_CALL(nvjpegJpegStreamDestroy(stream));
+      }
+      for (auto &buffer : pinned_buffers_) {
+        NVJPEG_CALL(nvjpegBufferPinnedDestroy(buffer));
+      }
+      for (auto &buffer : device_buffers_) {
+        NVJPEG_CALL(nvjpegBufferDeviceDestroy(buffer));
+      }
+      for (auto &params : decode_params_) {
+        NVJPEG_CALL(nvjpegDecodeParamsDestroy(params));
+      }
+      for (auto &event : decode_events_) {
+        CUDA_CALL(cudaEventDestroy(event));
+      }
+      for (auto &stream : streams_) {
+        CUDA_CALL(cudaStreamDestroy(stream));
+      }
+
+      NVJPEG_CALL(nvjpegDestroy(handle_));
+    } catch (const std::exception &e) {
+      // If destroying nvJPEG resources failed we are leaking something so terminate
+      std::cerr << "Fatal error: exception in ~nvJPEGDecoder():\n" << e.what() << std::endl;
+      std::terminate();
     }
-    CUDA_CALL(cudaEventDestroy(master_event_));
-    NVJPEG_CALL(nvjpegDestroy(handle_));
   }
 
   using dali::OperatorBase::Run;
@@ -221,11 +252,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     output.Resize(output_shape_);
     output.SetLayout(DALI_NHWC);
 
-    CUDA_CALL(cudaEventRecord(master_event_, ws->stream()));
-    for (int i = 0; i < num_threads_; ++i) {
-      CUDA_CALL(cudaStreamWaitEvent(streams_[i], master_event_, 0));
-    }
-
     for (int idx = 0; idx < batch_size_; ++idx) {
       const int i = image_order[idx].second;
 
@@ -247,14 +273,118 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     LoadDeferred(ws->stream());
 
     thread_pool_.WaitForWork();
-    // record all the current streamed work
+    // wait for all work in workspace master stream
     for (int i = 0; i < num_threads_; ++i) {
-      CUDA_CALL(cudaEventRecord(events_[i], streams_[i]));
+      CUDA_CALL(cudaEventRecord(decode_events_[i], streams_[i]));
+      CUDA_CALL(cudaStreamWaitEvent(ws->stream(), decode_events_[i], 0));
     }
-    // waiting all previous recorded events
-    for (int i = 0; i < num_threads_ * 2; ++i) {
-      CUDA_CALL(cudaStreamWaitEvent(ws->stream(), events_[i], 0));
+  }
+
+  class PinnedBufferPool {
+   public:
+    void init(int count) {
+      std::lock_guard<std::mutex> lock(m_);
+      indices_.resize(count);
+      std::iota(indices_.begin(), indices_.end(), 0);
     }
+
+    int get() {
+      std::unique_lock<std::mutex> lock(m_);
+      cv_.wait(lock, [this]() {
+        spinlock_acquire();
+        bool ret = is_shut_down_ || !indices_.empty();
+        spinlock_release();
+        return ret;
+      });
+      if (is_shut_down_)
+        return -1;
+      spinlock_acquire();
+      int idx = indices_.back();
+      indices_.pop_back();
+      spinlock_release();
+      return idx;
+    }
+
+    void put(int idx) {
+      spinlock_acquire();
+      indices_.push_back(idx);
+      spinlock_release();
+      cv_.notify_one();
+    }
+
+    void shutdown() {
+      {
+        spinlock_acquire();
+        is_shut_down_ = true;
+        spinlock_release();
+      }
+      cv_.notify_all();
+    }
+
+   private:
+    void spinlock_acquire() {
+      while (spinlock_.test_and_set(std::memory_order_acquire)) {}
+      std::atomic_thread_fence(std::memory_order_acquire);
+    }
+    void spinlock_release() {
+      std::atomic_thread_fence(std::memory_order_release);
+      spinlock_.clear(std::memory_order_release);
+    }
+
+    std::atomic_flag spinlock_ = ATOMIC_FLAG_INIT;
+
+    std::vector<int> indices_;
+    std::mutex m_;
+    std::condition_variable cv_;
+    bool is_shut_down_ = false;
+  } buffer_idx_pool_;
+
+  class PinnedBufferLease {
+   public:
+    PinnedBufferLease() = default;
+    explicit PinnedBufferLease(PinnedBufferPool *owner, int index) noexcept
+    : owner_(owner), index_(index) {}
+
+    ~PinnedBufferLease() {
+      reset();
+    }
+
+    PinnedBufferLease(const PinnedBufferLease &) = delete;
+    PinnedBufferLease(PinnedBufferLease &&other) noexcept
+    : owner_(other.owner_), index_(other.index_) {
+      other.index_ = -1;
+    }
+
+    PinnedBufferLease &operator=(PinnedBufferLease &&other) noexcept {
+      std::swap(owner_, other.owner_);
+      std::swap(index_, other.index_);
+      return *this;
+    }
+
+    void reset() {
+      if (index_ >= 0) {
+        owner_->put(index_);
+        index_ = -1;
+      }
+    }
+
+    int get() const noexcept { return index_; }
+    int release() noexcept {
+      int idx = index_;
+      index_ = -1;
+      return idx;
+    }
+   private:
+    PinnedBufferPool *owner_ = nullptr;
+    int index_ = -1;
+  };
+
+  PinnedBufferLease GetPinnedBuffer() {
+    return PinnedBufferLease(&buffer_idx_pool_, buffer_idx_pool_.get());
+  }
+
+  void PutBackPinnedBuffer(int index) {
+    buffer_idx_pool_.put(index);
   }
 
   // Per sample worker called in a thread of the thread pool.
@@ -271,25 +401,23 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       return;
     }
 
-    curr_pinned_buff_[thread_id] = (curr_pinned_buff_[thread_id] + 1) % 2;
-    const int buff_idx = thread_id + (curr_pinned_buff_[thread_id] * num_threads_);
-
+    PinnedBufferLease buff = GetPinnedBuffer();
+    const int jpeg_stream_idx = buff.get();
+    assert(jpeg_stream_idx >=0 && static_cast<size_t>(jpeg_stream_idx) < jpeg_streams_.size());
     NVJPEG_CALL(nvjpegStateAttachPinnedBuffer(image_states_[sample_idx],
-                                              pinned_buffer_[buff_idx]));
+                                              pinned_buffers_[buff.get()]));
     NVJPEG_CALL(nvjpegJpegStreamParse(handle_,
                                       static_cast<const unsigned char*>(input_data),
                                       in_size,
                                       false,
                                       false,
-                                      jpeg_streams_[buff_idx]));
-
-    CUDA_CALL(cudaEventSynchronize(events_[buff_idx]));
+                                      jpeg_streams_[jpeg_stream_idx]));
 
     nvjpegStatus_t ret = nvjpegDecodeJpegHost(handle_,
                                               image_decoders_[sample_idx],
                                               image_states_[sample_idx],
                                               decode_params_[sample_idx],
-                                              jpeg_streams_[buff_idx]);
+                                              jpeg_streams_[jpeg_stream_idx]);
     // If image is somehow not supported try hostdecoder
     if (ret != NVJPEG_STATUS_SUCCESS) {
       if (ret == NVJPEG_STATUS_JPEG_NOT_SUPPORTED || ret == NVJPEG_STATUS_BAD_JPEG) {
@@ -305,17 +433,18 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
-                                                device_buffer_[thread_id]));
+                                                device_buffers_[thread_id]));
 
       NVJPEG_CALL(nvjpegDecodeJpegTransferToDevice(
           handle_,
           image_decoders_[sample_idx],
           image_states_[sample_idx],
-          jpeg_streams_[buff_idx],
+          jpeg_streams_[jpeg_stream_idx],
           streams_[thread_id]));
 
-      // Next sample processed in this thread has to know when H2D finished
-      CUDA_CALL(cudaEventRecord(events_[buff_idx], streams_[thread_id]));
+      std::unique_ptr<CompletionCallbackParams > params(new CompletionCallbackParams{ this, thread_id, std::move(buff) });
+      CUDA_CALL(cudaStreamAddCallback(streams_[thread_id], mixed_stage_complete_cb, params.get(), 0));
+      params.release();
 
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
@@ -323,10 +452,40 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           &nvjpeg_image,
           streams_[thread_id]));
+
     } else {
       HostFallback<kernels::StorageGPU>(input_data, in_size, output_image_type_, output_data,
                                         streams_[thread_id], file_name, info.crop_window);
     }
+  }
+
+  struct CompletionCallbackParams {
+    nvJPEGDecoder *self;
+    int thread_id;
+    PinnedBufferLease buff;
+  };
+
+  static void CUDART_CB
+  mixed_stage_complete_cb(cudaStream_t stream,  cudaError_t status, void *data) {
+    auto *params = static_cast<CompletionCallbackParams*>(data);
+    params->self->MixedStageComplete(stream, status, params);
+    delete params;
+  }
+
+  void SetThreadStatus(int thread_id, cudaError_t status) {
+    if (thread_errors_[thread_id] == cudaSuccess)
+      thread_errors_[thread_id] = status;
+  }
+
+  void CheckThreadStatus(int thread_id) {
+    CUDA_CALL(thread_errors_[thread_id]);
+  }
+
+  void MixedStageComplete(cudaStream_t stream, cudaError_t status, CompletionCallbackParams *params) {
+    int thread_id = params->thread_id;
+    int buff_idx = params->buff.get();
+    params->buff.reset();
+    SetThreadStatus(thread_id, status);
   }
 
   USE_OPERATOR_MEMBERS();
@@ -351,18 +510,20 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
   std::vector<nvjpegJpegState_t> decoder_host_state_;
   std::vector<nvjpegJpegState_t> decoder_huff_hybrid_state_;
   std::vector<Dims> output_shape_;
-  // Per thread - double buffered
+
   std::vector<nvjpegJpegStream_t> jpeg_streams_;
-  std::vector<nvjpegBufferPinned_t> pinned_buffer_;
-  std::vector<uint8_t> curr_pinned_buff_;
+
+  // Per thread - double buffered
+  std::vector<nvjpegBufferPinned_t> pinned_buffers_;
 
   // GPU
   // Per thread
-  std::vector<nvjpegBufferDevice_t> device_buffer_;
+  std::vector<nvjpegBufferDevice_t> device_buffers_;
   std::vector<cudaStream_t> streams_;
-  std::vector<cudaEvent_t> events_;
+  std::vector<cudaEvent_t> decode_events_;
+  std::vector<cudaError_t> thread_errors_;
 
-  cudaEvent_t master_event_;
+  int device_id_;
 
   ThreadPool thread_pool_;
 };
