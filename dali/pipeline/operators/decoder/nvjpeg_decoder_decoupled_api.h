@@ -61,7 +61,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     device_id_(spec.GetArgument<int>("device_id")),
     thread_pool_(num_threads_,
                  spec.GetArgument<int>("device_id"),
-                 true /* pin threads */) {
+                 false /* pin threads */) {
     NVJPEG_CALL(nvjpegCreateSimple(&handle_));
 
     size_t device_memory_padding = spec.GetArgument<Index>("device_memory_padding");
@@ -429,6 +429,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
                                               image_states_[sample_idx],
                                               decode_params_[sample_idx],
                                               jpeg_streams_[jpeg_stream_idx]);
+
     // If image is somehow not supported try hostdecoder
     if (ret != NVJPEG_STATUS_SUCCESS) {
       if (ret == NVJPEG_STATUS_JPEG_NOT_SUPPORTED || ret == NVJPEG_STATUS_BAD_JPEG) {
@@ -443,7 +444,8 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.channel[0] = output_data;
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
-      CUDA_CALL(cudaEventSynchronize(transfer_events_[thread_id]));
+      //CUDA_CALL(cudaStreamSynchronize(stream));
+      CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
 
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
                                                 device_buffers_[thread_id]));
@@ -455,8 +457,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           jpeg_streams_[jpeg_stream_idx],
           stream));
 
-      CUDA_CALL(cudaEventRecord(transfer_events_[thread_id]));
-
       /*std::unique_ptr<CompletionCallbackParams > params(new CompletionCallbackParams{ this, thread_id, std::move(buff) });
       CUDA_CALL(cudaStreamAddCallback(stream, mixed_stage_complete_cb, params.get(), 0));
       params.release();*/
@@ -467,6 +467,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           &nvjpeg_image,
           stream));
+      CUDA_CALL(cudaEventRecord(decode_events_[thread_id]));
 
     } else {
       HostFallback<kernels::StorageGPU>(input_data, in_size, output_image_type_, output_data,
