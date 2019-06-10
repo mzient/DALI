@@ -416,11 +416,11 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     NVJPEG_CALL(nvjpegJpegStreamParse(handle_,
                                       static_cast<const unsigned char*>(input_data),
                                       in_size,
-                                      true,
-                                      true,
+                                      false,
+                                      false,
                                       jpeg_streams_[jpeg_stream_idx]));
 
-    CUDA_CALL(cudaEventSynchronize(transfer_events_[buff_idx]));
+    //CUDA_CALL(cudaEventSynchronize(transfer_events_[buff_idx]));
     nvjpegStatus_t ret = nvjpegDecodeJpegHost(handle_,
                                               image_decoders_[sample_idx],
                                               image_states_[sample_idx],
@@ -441,6 +441,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.channel[0] = output_data;
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
+      CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
                                                 device_buffers_[thread_id]));
 
@@ -450,7 +451,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           jpeg_streams_[jpeg_stream_idx],
           stream));
-      CUDA_CALL(cudaEventRecord(transfer_events_[buff_idx], stream));
+      //CUDA_CALL(cudaEventRecord(transfer_events_[buff_idx], stream));
 
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
@@ -458,7 +459,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           &nvjpeg_image,
           stream));
-      //CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
+      CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
 
     } else {
       HostFallback<kernels::StorageGPU>(input_data, in_size, output_image_type_, output_data,
