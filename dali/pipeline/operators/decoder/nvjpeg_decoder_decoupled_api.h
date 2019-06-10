@@ -50,8 +50,9 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     decoder_host_state_(batch_size_),
     decoder_huff_hybrid_state_(batch_size_),
     output_shape_(batch_size_),
-    jpeg_streams_(num_threads_*2),
     pinned_buffers_(num_threads_*2),
+    jpeg_streams_(num_threads_*2),
+    transfer_events_(num_threads_*2),
     device_buffers_(num_threads_),
     streams_(num_threads_),
     decode_events_(num_threads_),
@@ -106,6 +107,10 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       CUDA_CALL(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
     }
     for (auto &event : decode_events_) {
+      CUDA_CALL(cudaEventCreate(&event));
+      CUDA_CALL(cudaEventRecord(event, streams_[0]));
+    }
+    for (auto &event : transfer_events_) {
       CUDA_CALL(cudaEventCreate(&event));
       CUDA_CALL(cudaEventRecord(event, streams_[0]));
     }
@@ -415,6 +420,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
                                       true,
                                       jpeg_streams_[jpeg_stream_idx]));
 
+    CUDA_CALL(cudaEventSynchronize(transfer_events_[buff_idx]));
     nvjpegStatus_t ret = nvjpegDecodeJpegHost(handle_,
                                               image_decoders_[sample_idx],
                                               image_states_[sample_idx],
@@ -435,8 +441,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.channel[0] = output_data;
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
-      CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
-
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
                                                 device_buffers_[thread_id]));
 
@@ -446,6 +450,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           jpeg_streams_[jpeg_stream_idx],
           stream));
+      CUDA_CALL(cudaEventRecord(transfer_events_[buff_idx], stream));
 
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
@@ -453,7 +458,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           &nvjpeg_image,
           stream));
-      CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
+      //CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
 
     } else {
       HostFallback<kernels::StorageGPU>(input_data, in_size, output_image_type_, output_data,
@@ -488,6 +493,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
   // Per thread - double buffered
   std::vector<nvjpegBufferPinned_t> pinned_buffers_;
   std::vector<nvjpegJpegStream_t> jpeg_streams_;
+  std::vector<cudaEvent_t> transfer_events_;
 
   // GPU
   // Per thread
