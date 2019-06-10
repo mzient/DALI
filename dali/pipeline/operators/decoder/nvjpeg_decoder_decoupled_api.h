@@ -55,7 +55,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     device_buffers_(num_threads_),
     streams_(num_threads_),
     decode_events_(num_threads_),
-    thread_errors_(num_threads_),
     transfer_events_(num_threads_),
     thread_page_ids_(num_threads_),
     device_id_(spec.GetArgument<int>("device_id")),
@@ -115,8 +114,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       CUDA_CALL(cudaEventCreate(&event));
       CUDA_CALL(cudaEventRecord(event, streams_[0]));
     }
-
-    buffer_idx_pool_.init(pinned_buffers_.size());
   }
 
   ~nvJPEGDecoder() override {
@@ -408,8 +405,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       return;
     }
 
-    //PinnedBufferLease buff = GetPinnedBuffer();
-
     const int page = thread_page_ids_[thread_id];
     thread_page_ids_[thread_id] ^= 1;  // negate LSB
 
@@ -445,7 +440,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.channel[0] = output_data;
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
-      //CUDA_CALL(cudaStreamSynchronize(stream));
       CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
 
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
@@ -457,10 +451,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           jpeg_streams_[jpeg_stream_idx],
           stream));
-
-      /*std::unique_ptr<CompletionCallbackParams > params(new CompletionCallbackParams{ this, thread_id, std::move(buff) });
-      CUDA_CALL(cudaStreamAddCallback(stream, mixed_stage_complete_cb, params.get(), 0));
-      params.release();*/
+      CUDA_CALL(cudaEventRecord(transfer_events_[thread_id], stream));
 
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
@@ -476,34 +467,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     }
   }
 
-  struct CompletionCallbackParams {
-    nvJPEGDecoder *self;
-    int thread_id;
-    PinnedBufferLease buff;
-  };
-
-  static void CUDART_CB
-  mixed_stage_complete_cb(cudaStream_t stream,  cudaError_t status, void *data) {
-    auto *params = static_cast<CompletionCallbackParams*>(data);
-    params->self->MixedStageComplete(stream, status, params);
-    delete params;
-  }
-
-  void SetThreadStatus(int thread_id, cudaError_t status) {
-    if (thread_errors_[thread_id] == cudaSuccess)
-      thread_errors_[thread_id] = status;
-  }
-
-  void CheckThreadStatus(int thread_id) {
-    CUDA_CALL(thread_errors_[thread_id]);
-  }
-
-  void MixedStageComplete(cudaStream_t stream, cudaError_t status, CompletionCallbackParams *params) {
-    int thread_id = params->thread_id;
-    int buff_idx = params->buff.get();
-    params->buff.reset();
-    SetThreadStatus(thread_id, status);
-  }
 
   USE_OPERATOR_MEMBERS();
   nvjpegHandle_t handle_;
@@ -538,7 +501,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
   std::vector<cudaStream_t> streams_;
   std::vector<cudaEvent_t> decode_events_;
   std::vector<cudaEvent_t> transfer_events_;
-  std::vector<cudaError_t> thread_errors_;
   std::vector<int> thread_page_ids_;  // page index for double-buffering
 
   int device_id_;
