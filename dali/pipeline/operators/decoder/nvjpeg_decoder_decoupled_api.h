@@ -55,7 +55,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
     device_buffers_(num_threads_),
     streams_(num_threads_),
     decode_events_(num_threads_),
-    transfer_events_(num_threads_),
     thread_page_ids_(num_threads_),
     device_id_(spec.GetArgument<int>("device_id")),
     thread_pool_(num_threads_,
@@ -107,10 +106,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       CUDA_CALL(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
     }
     for (auto &event : decode_events_) {
-      CUDA_CALL(cudaEventCreate(&event));
-      CUDA_CALL(cudaEventRecord(event, streams_[0]));
-    }
-    for (auto &event : transfer_events_) {
       CUDA_CALL(cudaEventCreate(&event));
       CUDA_CALL(cudaEventRecord(event, streams_[0]));
     }
@@ -451,7 +446,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           image_states_[sample_idx],
           jpeg_streams_[jpeg_stream_idx],
           stream));
-      CUDA_CALL(cudaEventRecord(transfer_events_[thread_id], stream));
 
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
@@ -500,7 +494,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
   std::vector<nvjpegBufferDevice_t> device_buffers_;
   std::vector<cudaStream_t> streams_;
   std::vector<cudaEvent_t> decode_events_;
-  std::vector<cudaEvent_t> transfer_events_;
   std::vector<int> thread_page_ids_;  // page index for double-buffering
 
   int device_id_;
