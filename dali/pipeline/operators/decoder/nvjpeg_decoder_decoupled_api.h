@@ -408,12 +408,12 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       return;
     }
 
-    //PinnedBufferLease buff = GetPinnedBuffer();
+    PinnedBufferLease buff = GetPinnedBuffer();
 
-    const int page = thread_page_ids_[thread_id];
-    thread_page_ids_[thread_id] ^= 1;  // negate LSB
+    /*const int page = thread_page_ids_[thread_id];
+    thread_page_ids_[thread_id] ^= 1;  // negate LSB*/
 
-    const int buff_idx = 2*thread_id + page;
+    const int buff_idx = buff.get();
     const int jpeg_stream_idx = buff_idx;
     assert(jpeg_stream_idx >=0 && static_cast<size_t>(jpeg_stream_idx) < jpeg_streams_.size());
     NVJPEG_CALL(nvjpegStateAttachPinnedBuffer(image_states_[sample_idx],
@@ -446,7 +446,7 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
       nvjpeg_image.pitch[0] = NumberOfChannels(output_image_type_) * info.widths[0];
 
       //CUDA_CALL(cudaStreamSynchronize(stream));
-      CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
+      //CUDA_CALL(cudaEventSynchronize(decode_events_[thread_id]));
 
       NVJPEG_CALL(nvjpegStateAttachDeviceBuffer(image_states_[sample_idx],
                                                 device_buffers_[thread_id]));
@@ -458,17 +458,17 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
           jpeg_streams_[jpeg_stream_idx],
           stream));
 
-      /*std::unique_ptr<CompletionCallbackParams > params(new CompletionCallbackParams{ this, thread_id, std::move(buff) });
-      CUDA_CALL(cudaStreamAddCallback(stream, mixed_stage_complete_cb, params.get(), 0));
-      params.release();*/
-
       NVJPEG_CALL(nvjpegDecodeJpegDevice(
           handle_,
           image_decoders_[sample_idx],
           image_states_[sample_idx],
           &nvjpeg_image,
           stream));
-      CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
+      //CUDA_CALL(cudaEventRecord(decode_events_[thread_id], stream));
+
+      std::unique_ptr<CompletionCallbackParams > params(new CompletionCallbackParams{ this, thread_id, std::move(buff) });
+      CUDA_CALL(cudaStreamAddCallback(stream, mixed_stage_complete_cb, params.get(), 0));
+      params.release();
 
     } else {
       HostFallback<kernels::StorageGPU>(input_data, in_size, output_image_type_, output_data,
