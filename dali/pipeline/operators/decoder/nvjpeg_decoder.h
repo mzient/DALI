@@ -463,6 +463,8 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
                               tmp.rows * tmp.cols * c,
                               cudaMemcpyHostToDevice, s));
   }
+  // maximum number of streams to use to decode + convert
+  const int max_streams_;
 
   nvjpegHandle_t handle_;
   vector<nvjpegJpegState_t> states_;
@@ -472,9 +474,6 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
 
   // output colour format
   DALIImageType output_type_;
-
-  // maximum number of streams to use to decode + convert
-  const int max_streams_;
 
  protected:
   // Storage for per-image info
