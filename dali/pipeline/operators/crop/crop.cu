@@ -14,7 +14,7 @@
 
 #include <vector>
 #include "dali/image/transform.h"
-#include "dali/kernels/slice/slice_gpu.cuh"
+#include "dali/kernels/slice/slice_gpu.h"
 #include "dali/core/static_switch.h"
 #include "dali/pipeline/operators/crop/crop.h"
 #include "dali/pipeline/data/views.h"

@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include <string>
+#include "dali/core/convert.h"
 #include "dali/kernels/slice/slice_kernel_test.h"
 #include "dali/kernels/slice/slice_flip_normalize_permute_common.h"
 
@@ -339,18 +340,18 @@ using SLICE_FLIP_NORMALIZE_PERMUTE_TEST_TYPES = ::testing::Types<
       SliceFlipNormPermArgsGen_NormalizeOnly_Scalar<float, 3>>,
     SliceTestArgs<int, float, 3, 1, 2,
       SliceFlipNormPermArgsGen_NormalizeAndFlipDim<float, 3, 0>>,
-    SliceTestArgs<int, float, 2, 1, 10,
-      SliceFlipNormPermArgsGen_PermuteOnly_ReversedDims<float, 2>>,
+    /*SliceTestArgs<int, float, 2, 1, 10,
+      SliceFlipNormPermArgsGen_PermuteOnly_ReversedDims<float, 2>>,*/
     SliceTestArgs<int, float, 3, 1, 2,
       SliceFlipNormPermArgsGen_PermuteOnly_ReversedDims<float, 3>>,
-    SliceTestArgs<int, float, 2, 1, 1,
+    /*SliceTestArgs<int, float, 2, 1, 1,
       SliceFlipNormPermArgsGen_PermuteOnly_ReversedDims<float, 2>, 10, 2>,
     SliceTestArgs<int, float, 2, 1, 1,
       SliceFlipNormPermArgsGen_PermuteOnly_ReversedDims<float, 2>, 2, 10>,
     SliceTestArgs<int, float, 2, 1, 1,
       SliceFlipNormPermArgsGen_PermuteAndSliceHalf_ReversedDims<float, 2>, 2, 10>,
     SliceTestArgs<int, float, 2, 1, 1,
-      SliceFlipNormPermArgsGen_PermuteAndSliceHalf_PermuteHW<float, 2>, 2, 10>,
+      SliceFlipNormPermArgsGen_PermuteAndSliceHalf_PermuteHW<float, 2>, 2, 10>,*/
     SliceTestArgs<int, float, 3, 1, 2,
       SliceFlipNormPermArgsGen_SliceFlipNormalizePermute_PermuteHWC2CHW<float, 3>, 2, 2>,
     SliceTestArgs<int, uint8_t, 3, 1, 3,

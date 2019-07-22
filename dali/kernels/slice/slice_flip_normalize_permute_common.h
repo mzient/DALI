@@ -19,36 +19,13 @@
 #include <vector>
 #include "dali/core/common.h"
 #include "dali/kernels/kernel.h"
+#include "dali/kernels/slice/slice_args.h"
 #include "dali/kernels/slice/slice_kernel_test.h"
 
 namespace dali {
 namespace kernels {
 
-template <size_t Dims>
-struct SliceFlipNormalizePermuteArgs {
-  template <typename Shape>
-  explicit SliceFlipNormalizePermuteArgs(const Shape &_shape) {
-    for (size_t d = 0; d < Dims; d++) {
-      anchor[d] = 0;
-      shape[d] = _shape[d];
-      padded_shape[d] = _shape[d];
-      flip[d] = false;
-      permuted_dims[d] = d;
-    }
-  }
-
-  std::array<int64_t, Dims> anchor;
-  std::array<int64_t, Dims> shape;
-  std::array<int64_t, Dims> padded_shape;
-  std::array<bool, Dims> flip;
-  std::array<int64_t, Dims> permuted_dims;
-  size_t normalization_dim = Dims-1;
-  size_t normalization_index = 0;
-  std::vector<float> mean;
-  std::vector<float> inv_stddev;
-};
-
-namespace detail {
+namespace slice {
 
 template <size_t Dims>
 struct SliceFlipNormalizePermuteProcessedArgs {
@@ -92,9 +69,9 @@ SliceFlipNormalizePermuteProcessedArgs<Dims> ProcessArgs(
   processed_args.in_strides = GetStrides<Dims>(in_shape);
 
   auto slice_shape = args.shape;
-  processed_args.out_shape = detail::permute<Dims>(slice_shape, args.permuted_dims);
+  processed_args.out_shape = slice::permute<Dims>(slice_shape, args.permuted_dims);
   processed_args.padded_out_shape =
-    detail::permute<Dims>(args.padded_shape, args.permuted_dims);
+    slice::permute<Dims>(args.padded_shape, args.permuted_dims);
   processed_args.out_strides = GetStrides<Dims>(processed_args.padded_out_shape);
 
   // Flip operation is implemented by manipulating the anchor and the sign of the input strides
@@ -108,7 +85,7 @@ SliceFlipNormalizePermuteProcessedArgs<Dims> ProcessArgs(
     }
   }
 
-  processed_args.in_strides = detail::permute(processed_args.in_strides, args.permuted_dims);
+  processed_args.in_strides = slice::permute(processed_args.in_strides, args.permuted_dims);
 
   DALI_ENFORCE(args.mean.size() == args.inv_stddev.size());
   const bool should_normalize = !args.mean.empty();
@@ -119,14 +96,14 @@ SliceFlipNormalizePermuteProcessedArgs<Dims> ProcessArgs(
     const bool is_scalar_norm = args.mean.size() == 1;
     if (!is_scalar_norm) {
       processed_args.normalization_dim =
-        detail::inverse_permutation(args.permuted_dims)[args.normalization_dim];
+        slice::inverse_permutation(args.permuted_dims)[args.normalization_dim];
       DALI_ENFORCE(args.mean.size() ==
                    static_cast<size_t>(processed_args.out_shape[processed_args.normalization_dim]));
     }
   }
   return processed_args;
 }
-}  // namespace detail
+}  // namespace slice
 
 }  // namespace kernels
 }  // namespace dali

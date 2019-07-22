@@ -13,24 +13,23 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
-#include "dali/kernels/scratch.h"
 #include "dali/kernels/slice/slice_kernel_test.h"
-#include "dali/kernels/slice/slice_flip_normalize_permute_gpu.cuh"
-#include "dali/kernels/slice/slice_flip_normalize_permute_kernel_test.h"
+#include "dali/kernels/slice/slice_gpu.h"
+#include "dali/kernels/scratch.h"
 
 namespace dali {
 namespace kernels {
 
 template <typename TestArgs>
-class SliceFlipNormalizePermuteGPUTest : public SliceFlipNormalizePermuteTest<TestArgs> {
+class SliceGPUTest : public SliceTest<TestArgs> {
  public:
   using InputType = typename TestArgs::InputType;
   using OutputType = typename TestArgs::OutputType;
-  static constexpr size_t Dims = TestArgs::Dims;
-  static constexpr size_t NumSamples = TestArgs::NumSamples;
-  static constexpr size_t DimSize = TestArgs::DimSize;
+  static constexpr std::size_t Dims = TestArgs::Dims;
+  static constexpr std::size_t NumSamples = TestArgs::NumSamples;
+  static constexpr std::size_t DimSize = TestArgs::DimSize;
   using ArgsGenerator = typename TestArgs::ArgsGenerator;
-  using KernelType = SliceFlipNormalizePermuteGPU<OutputType, InputType, Dims>;
+  using KernelType = SliceGPU<OutputType, InputType, Dims>;
 
   void Run() override {
     KernelContext ctx;
@@ -38,10 +37,10 @@ class SliceFlipNormalizePermuteGPUTest : public SliceFlipNormalizePermuteTest<Te
     TestTensorList<InputType, Dims> test_data;
     this->PrepareData(test_data);
 
-    auto args = this->GenerateArgs(test_data.cpu());
+    auto slice_args = this->GenerateArgs(test_data.cpu());
 
     KernelType kernel;
-    KernelRequirements req = kernel.Setup(ctx, test_data.gpu(), args);
+    KernelRequirements req = kernel.Setup(ctx, test_data.gpu(), slice_args);
 
     ScratchpadAllocator scratch_alloc;
     scratch_alloc.Reserve(req.scratch_sizes);
@@ -50,35 +49,27 @@ class SliceFlipNormalizePermuteGPUTest : public SliceFlipNormalizePermuteTest<Te
 
     TensorListShape<> output_shapes = req.output_shapes[0];
     for (int i = 0; i < output_shapes.size(); i++) {
-      auto padded_out_shape = args[i].padded_shape;
-      auto expected_shape = padded_out_shape;
-      for (size_t d = 0; d < Dims; d++) {
-        size_t perm_d = args[i].permuted_dims[d];
-        expected_shape[d] = padded_out_shape[perm_d];
-      }
-      AssertExpectedDimensions(output_shapes[i], expected_shape);
+      AssertExpectedDimensions(output_shapes[i], slice_args[i].shape);
     }
 
     TestTensorList<OutputType, Dims> output_data;
     output_data.reshape(output_shapes.to_static<Dims>());
     OutListGPU<OutputType, Dims> out_tlv = output_data.gpu();
 
-    kernel.Run(ctx, out_tlv, test_data.gpu(), args);
+    kernel.Run(ctx, out_tlv, test_data.gpu(), slice_args);
 
     TestTensorList<OutputType, Dims> expected_output;
-    this->PrepareExpectedOutput(test_data, args, expected_output);
+    this->PrepareExpectedOutput(test_data, slice_args, expected_output);
 
-    EXPECT_NO_FATAL_FAILURE(Check(output_data.cpu(), expected_output.cpu(), EqualEps(1e-6)));
+    EXPECT_NO_FATAL_FAILURE(Check(output_data.cpu(), expected_output.cpu()));
   }
 };
 
-TYPED_TEST_SUITE(SliceFlipNormalizePermuteGPUTest, SLICE_FLIP_NORMALIZE_PERMUTE_TEST_TYPES);
+TYPED_TEST_SUITE(SliceGPUTest, SLICE_TEST_TYPES);
 
-TYPED_TEST(SliceFlipNormalizePermuteGPUTest, All) {
+TYPED_TEST(SliceGPUTest, All) {
   this->Run();
 }
-
-
 
 }  // namespace kernels
 }  // namespace dali

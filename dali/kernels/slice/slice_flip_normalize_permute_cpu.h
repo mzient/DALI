@@ -28,7 +28,7 @@
 namespace dali {
 namespace kernels {
 
-namespace detail {
+namespace slice {
 
 struct ClampPolicy {
   template <typename OutputType, typename InputType>
@@ -165,25 +165,25 @@ void SliceFlipNormalizePermute(OutputType *output, const InputType *input,
   const bool IsNextNormalizationDim = (0 == normalization_dim);
   if (should_normalize) {
     if (IsNextNormalizationDim) {
-      detail::SliceFlipNormalizePermuteImpl<NormalizePolicy, true>(
+      slice::SliceFlipNormalizePermuteImpl<NormalizePolicy, true>(
           output, input, in_strides, out_strides, out_shape, padded_out_shape,
           mean.data(), inv_stddev.data(), normalization_dim,
           std::integral_constant<size_t, Dims>());
     } else {
-      detail::SliceFlipNormalizePermuteImpl<NormalizePolicy, false>(
+      slice::SliceFlipNormalizePermuteImpl<NormalizePolicy, false>(
           output, input, in_strides, out_strides, out_shape, padded_out_shape,
           mean.data(), inv_stddev.data(), normalization_dim,
           std::integral_constant<size_t, Dims>());
     }
   } else {
-    detail::SliceFlipNormalizePermuteImpl<ClampPolicy, false>(
+    slice::SliceFlipNormalizePermuteImpl<ClampPolicy, false>(
         output, input, in_strides, out_strides, out_shape, padded_out_shape,
         nullptr, nullptr, 0,
         std::integral_constant<size_t, Dims>());
   }
 }
 
-}  // namespace detail
+}  // namespace slice
 
 template <typename OutputType, typename InputType, size_t Dims>
 class SliceFlipNormalizePermuteCPU {
@@ -196,7 +196,7 @@ class SliceFlipNormalizePermuteCPU {
     KernelRequirements req;
     TensorShape<Dims> out_shape(args.padded_shape);
     CheckValidOutputShape<Dims>(in.shape, out_shape, args);
-    out_shape = detail::permute<Dims>(out_shape, args.permuted_dims);
+    out_shape = slice::permute<Dims>(out_shape, args.permuted_dims);
     req.output_shapes.push_back(uniform_list_shape<Dims>(1, out_shape));
     return req;
   }
@@ -205,8 +205,8 @@ class SliceFlipNormalizePermuteCPU {
            OutTensorCPU<OutputType, Dims> &out,
            const InTensorCPU<InputType, Dims> &in,
            const Args &args) {
-    auto processed_args = detail::ProcessArgs<Dims>(args, in.shape);
-    detail::SliceFlipNormalizePermute(
+    auto processed_args = slice::ProcessArgs<Dims>(args, in.shape);
+    slice::SliceFlipNormalizePermute(
         out.data, in.data + processed_args.input_offset, processed_args.in_strides,
         processed_args.out_strides, processed_args.out_shape, processed_args.padded_out_shape,
         processed_args.mean, processed_args.inv_stddev, processed_args.normalization_dim);

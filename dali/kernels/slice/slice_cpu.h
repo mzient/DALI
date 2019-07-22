@@ -26,7 +26,7 @@
 namespace dali {
 namespace kernels {
 
-namespace detail {
+namespace slice {
 
 template <typename OutputType, typename InputType, std::size_t Dims>
 void SliceKernelImpl(OutputType *output,
@@ -56,7 +56,7 @@ void SliceKernelImpl(OutputType *output,
   }
 }
 
-}  // namespace detail
+}  // namespace slice
 
 template <typename OutputType, typename InputType, std::size_t Dims>
 void SliceKernel(OutputType *output,
@@ -68,7 +68,7 @@ void SliceKernel(OutputType *output,
   for (size_t d = 0; d < Dims; d++) {
     input += in_strides[d] * anchor[d];
   }
-  detail::SliceKernelImpl(output, input, in_strides, out_strides, out_shape,
+  slice::SliceKernelImpl(output, input, in_strides, out_strides, out_shape,
                           std::integral_constant<size_t, Dims>());
 }
 

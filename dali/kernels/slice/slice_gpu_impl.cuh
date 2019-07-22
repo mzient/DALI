@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_KERNELS_SLICE_SLICE_GPU_H_
-#define DALI_KERNELS_SLICE_SLICE_GPU_H_
+#ifndef DALI_KERNELS_SLICE_SLICE_GPU_IMPL_CUH_
+#define DALI_KERNELS_SLICE_SLICE_GPU_IMPL_CUH_
 
 #include <cuda_runtime.h>
 #include <vector>
 #include <utility>
+#include "dali/kernels/slice/slice_gpu.h"
 #include "dali/kernels/slice/slice_kernel_utils.h"
 #include "dali/kernels/kernel.h"
 #include "dali/core/common.h"
@@ -30,7 +31,7 @@
 namespace dali {
 namespace kernels {
 
-namespace detail {
+namespace slice {
 
 template <size_t Dims>
 struct SliceSampleDesc {
@@ -81,10 +82,10 @@ __global__ void SliceKernel(const SliceSampleDesc<Dims> *samples, const BlockDes
   SliceFunc<Dims>(out, in, sample.out_strides.data(), sample.in_strides.data(), offset, block_end);
 }
 
-}  // namespace detail
+}  // namespace slice
 
 template <typename OutputType, typename InputType, size_t Dims>
-class SliceGPU {
+class SliceGPU<OutputType, InputType, Dims>::Impl {
  private:
   static constexpr size_t kBlockDim = 256;
   static constexpr size_t kBlockSize = 64 * kBlockDim;
@@ -97,8 +98,8 @@ class SliceGPU {
     KernelRequirements req;
     ScratchpadEstimator se;
     const size_t num_samples = in.size();
-    se.add<detail::SliceSampleDesc<Dims>>(AllocType::Host, num_samples);
-    se.add<detail::SliceSampleDesc<Dims>>(AllocType::GPU, num_samples);
+    se.add<slice::SliceSampleDesc<Dims>>(AllocType::Host, num_samples);
+    se.add<slice::SliceSampleDesc<Dims>>(AllocType::GPU, num_samples);
 
     std::vector<size_t> sample_sizes;
     sample_sizes.reserve(slice_args.size());
@@ -112,8 +113,8 @@ class SliceGPU {
         sample_size / static_cast<float>(kBlockSize));
     }
 
-    se.add<detail::BlockDesc>(AllocType::Host, block_count_);
-    se.add<detail::BlockDesc>(AllocType::GPU, block_count_);
+    se.add<slice::BlockDesc>(AllocType::Host, block_count_);
+    se.add<slice::BlockDesc>(AllocType::GPU, block_count_);
     req.scratch_sizes = se.sizes;
 
     req.output_shapes = { GetOutputShapes<Dims>(in.shape, slice_args) };
@@ -126,10 +127,10 @@ class SliceGPU {
            const std::vector<SliceArgs<Dims>> &slice_args) {
     const auto num_samples = in.size();
 
-    detail::SliceSampleDesc<Dims>* sample_descs_cpu =
-      context.scratchpad->Allocate<detail::SliceSampleDesc<Dims>>(AllocType::Host, num_samples);
-    detail::BlockDesc *block_descs_cpu =
-      context.scratchpad->Allocate<detail::BlockDesc>(AllocType::Host, block_count_);
+    slice::SliceSampleDesc<Dims>* sample_descs_cpu =
+      context.scratchpad->Allocate<slice::SliceSampleDesc<Dims>>(AllocType::Host, num_samples);
+    slice::BlockDesc *block_descs_cpu =
+      context.scratchpad->Allocate<slice::BlockDesc>(AllocType::Host, block_count_);
 
     std::vector<size_t> sample_sizes(in.size());
     for (int i = 0; i < in.size(); i++) {
@@ -160,28 +161,50 @@ class SliceGPU {
       }
     }
 
-    detail::SliceSampleDesc<Dims> *sample_descs =
-      context.scratchpad->Allocate<detail::SliceSampleDesc<Dims>>(
+    slice::SliceSampleDesc<Dims> *sample_descs =
+      context.scratchpad->Allocate<slice::SliceSampleDesc<Dims>>(
         AllocType::GPU, num_samples);
-    detail::BlockDesc *block_descs =
-      context.scratchpad->Allocate<detail::BlockDesc>(
+    slice::BlockDesc *block_descs =
+      context.scratchpad->Allocate<slice::BlockDesc>(
         AllocType::GPU, block_count_);
 
     // Memory is allocated contiguously, so we launch only one cudaMemcpyAsync
-    size_t total_bytes = num_samples * sizeof(detail::SliceSampleDesc<Dims>)
-      + block_count_ * sizeof(detail::BlockDesc);
+    size_t total_bytes = num_samples * sizeof(slice::SliceSampleDesc<Dims>)
+      + block_count_ * sizeof(slice::BlockDesc);
     cudaMemcpyAsync(sample_descs, sample_descs_cpu,
                     total_bytes,
                     cudaMemcpyHostToDevice,
                     context.gpu.stream);
 
     const auto grid = block_count_;
-    detail::SliceKernel<OutputType, InputType, Dims>
+    slice::SliceKernel<OutputType, InputType, Dims>
       <<<grid, kBlockDim, 0, context.gpu.stream>>>(sample_descs, block_descs);
   }
 };
 
+template <typename OutputType, typename InputType, size_t Dims>
+KernelRequirements SliceGPU<OutputType, InputType, Dims>::Setup(
+    KernelContext &context,
+    const InListGPU<InputType, Dims> &in,
+    const std::vector<SliceArgs<Dims>> &slice_args) {
+  return impl->Setup(context, in, slice_args);
+}
+
+template <typename OutputType, typename InputType, size_t Dims>
+void SliceGPU<OutputType, InputType, Dims>::Run(
+    KernelContext &context,
+    OutListGPU<OutputType, Dims> &out,
+    const InListGPU<InputType, Dims> &in,
+    const std::vector<SliceArgs<Dims>> &slice_args) {
+  return impl->Run(context, out, in, slice_args);
+}
+
+template <typename OutputType, typename InputType, size_t Dims>
+SliceGPU<OutputType, InputType, Dims>::SliceGPU()
+: impl(new Impl())
+{}
+
 }  // namespace kernels
 }  // namespace dali
 
-#endif  // DALI_KERNELS_SLICE_SLICE_GPU_H_
+#endif  // DALI_KERNELS_SLICE_SLICE_GPU_IMPL_CUH_

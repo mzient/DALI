@@ -20,15 +20,10 @@
 #include "dali/core/common.h"
 #include "dali/core/error_handling.h"
 #include "dali/kernels/kernel.h"
+#include "dali/kernels/slice/slice_args.h"
 
 namespace dali {
 namespace kernels {
-
-template <size_t Dims>
-struct SliceArgs {
-  std::array<int64_t, Dims> anchor;
-  std::array<int64_t, Dims> shape;
-};
 
 template <size_t Dims, typename Shape>
 std::array<int64_t, Dims> GetStrides(const Shape& shape) {

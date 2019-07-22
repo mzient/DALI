@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_H_
-#define DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_H_
+#ifndef DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_IMPL_H_
+#define DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_IMPL_H_
 
 #include <cuda_runtime.h>
 #include <utility>
@@ -26,11 +26,12 @@
 #include "dali/kernels/common/copy.h"
 #include "dali/kernels/kernel.h"
 #include "dali/kernels/slice/slice_flip_normalize_permute_common.h"
+#include "dali/kernels/slice/slice_flip_normalize_permute_gpu.h"
 
 namespace dali {
 namespace kernels {
 
-namespace detail {
+namespace slice {
 
 template <size_t Dims>
 struct SampleDesc {
@@ -145,10 +146,10 @@ __global__ void SliceFlipNormalizePermuteKernel(const SampleDesc<Dims> *samples,
     should_zero_pad, normalization_dim, norm_add, norm_mul, offset, block_end);
 }
 
-}  // namespace detail
+}  // namespace slice
 
 template <typename OutputType, typename InputType, size_t Dims>
-class SliceFlipNormalizePermuteGPU {
+class SliceFlipNormalizePermuteGPU<OutputType, InputType, Dims>::Impl {
  private:
   static constexpr size_t kBlockDim = 512;
   static constexpr size_t kBlockSize = 64 * kBlockDim;
@@ -162,8 +163,8 @@ class SliceFlipNormalizePermuteGPU {
     KernelRequirements req;
     ScratchpadEstimator se;
     const size_t num_samples = in.size();
-    se.add<detail::SampleDesc<Dims>>(AllocType::Host, num_samples);
-    se.add<detail::SampleDesc<Dims>>(AllocType::GPU, num_samples);
+    se.add<slice::SampleDesc<Dims>>(AllocType::Host, num_samples);
+    se.add<slice::SampleDesc<Dims>>(AllocType::GPU, num_samples);
 
     DALI_ENFORCE(args[0].mean.size() == args[0].inv_stddev.size());
     size_t norm_args_size = args[0].mean.size();
@@ -179,8 +180,8 @@ class SliceFlipNormalizePermuteGPU {
         sample_size / static_cast<float>(kBlockSize));
     }
 
-    se.add<detail::BlockDesc>(AllocType::Host, block_count_);
-    se.add<detail::BlockDesc>(AllocType::GPU, block_count_);
+    se.add<slice::BlockDesc>(AllocType::Host, block_count_);
+    se.add<slice::BlockDesc>(AllocType::GPU, block_count_);
     req.scratch_sizes = se.sizes;
 
     auto in_shapes = in.shape;
@@ -188,7 +189,7 @@ class SliceFlipNormalizePermuteGPU {
     for (int i = 0; i < in_shapes.size(); i++) {
       TensorShape<Dims> out_shape(args[i].padded_shape);
       CheckValidOutputShape<Dims>(in_shapes[i], out_shape, args[i]);
-      out_shape = detail::permute<Dims>(out_shape, args[i].permuted_dims);
+      out_shape = slice::permute<Dims>(out_shape, args[i].permuted_dims);
       output_shapes.set_tensor_shape(i, out_shape);
     }
     req.output_shapes = { output_shapes };
@@ -205,14 +206,14 @@ class SliceFlipNormalizePermuteGPU {
     auto inv_stddev_data = args[0].inv_stddev;
     DALI_ENFORCE(mean_data.size() == inv_stddev_data.size());
 
-    detail::SampleDesc<Dims>* sample_descs_cpu =
-      context.scratchpad->Allocate<detail::SampleDesc<Dims>>(AllocType::Host, num_samples);
+    slice::SampleDesc<Dims>* sample_descs_cpu =
+      context.scratchpad->Allocate<slice::SampleDesc<Dims>>(AllocType::Host, num_samples);
     float *norm_add_cpu = mean_data.empty() ? nullptr :
       context.scratchpad->Allocate<float>(AllocType::Host, mean_data.size());
     float *norm_mul_cpu = inv_stddev_data.empty() ? nullptr :
       context.scratchpad->Allocate<float>(AllocType::Host, inv_stddev_data.size());
-    detail::BlockDesc *block_descs_cpu =
-      context.scratchpad->Allocate<detail::BlockDesc>(AllocType::Host, block_count_);
+    slice::BlockDesc *block_descs_cpu =
+      context.scratchpad->Allocate<slice::BlockDesc>(AllocType::Host, block_count_);
 
     for (size_t i = 0; i < mean_data.size(); i++) {
       norm_add_cpu[i] = -mean_data[i] * inv_stddev_data[i];
@@ -222,7 +223,7 @@ class SliceFlipNormalizePermuteGPU {
     std::vector<size_t> sample_sizes(in.size());
     for (int i = 0; i < in.size(); i++) {
       const auto in_shape = in.tensor_shape(i);
-      auto processed_args = detail::ProcessArgs<Dims>(args[i], in_shape);
+      auto processed_args = slice::ProcessArgs<Dims>(args[i], in_shape);
       if (i == 0) {
         normalization_dim = processed_args.normalization_dim;
       } else {
@@ -250,8 +251,8 @@ class SliceFlipNormalizePermuteGPU {
       }
     }
 
-    detail::SampleDesc<Dims> *sample_descs =
-      context.scratchpad->Allocate<detail::SampleDesc<Dims>>(
+    slice::SampleDesc<Dims> *sample_descs =
+      context.scratchpad->Allocate<slice::SampleDesc<Dims>>(
         AllocType::GPU, num_samples);
 
     float *norm_add = mean_data.empty() ? nullptr :
@@ -262,15 +263,15 @@ class SliceFlipNormalizePermuteGPU {
       context.scratchpad->Allocate<float>(
         AllocType::GPU, inv_stddev_data.size());
 
-    detail::BlockDesc *block_descs =
-      context.scratchpad->Allocate<detail::BlockDesc>(
+    slice::BlockDesc *block_descs =
+      context.scratchpad->Allocate<slice::BlockDesc>(
         AllocType::GPU, block_count_);
 
     // Memory is allocated contiguously, so we launch only one cudaMemcpyAsync
-    size_t total_bytes = num_samples * sizeof(detail::SampleDesc<Dims>)
+    size_t total_bytes = num_samples * sizeof(slice::SampleDesc<Dims>)
       + mean_data.size() * sizeof(float)
       + inv_stddev_data.size() * sizeof(float)
-      + block_count_ * sizeof(detail::BlockDesc);
+      + block_count_ * sizeof(slice::BlockDesc);
     cudaMemcpyAsync(sample_descs, sample_descs_cpu,
                     total_bytes,
                     cudaMemcpyHostToDevice,
@@ -278,18 +279,39 @@ class SliceFlipNormalizePermuteGPU {
 
     const auto grid = block_count_;
     if (norm_add != nullptr && norm_mul != nullptr) {
-      detail::SliceFlipNormalizePermuteKernel<OutputType, InputType, Dims, true>
+      slice::SliceFlipNormalizePermuteKernel<OutputType, InputType, Dims, true>
           <<<grid, kBlockDim, 0, context.gpu.stream>>>(sample_descs, block_descs, norm_add,
                                                        norm_mul, normalization_dim);
     } else {
-      detail::SliceFlipNormalizePermuteKernel<OutputType, InputType, Dims, false>
+      slice::SliceFlipNormalizePermuteKernel<OutputType, InputType, Dims, false>
           <<<grid, kBlockDim, 0, context.gpu.stream>>>(sample_descs, block_descs, norm_add,
                                                        norm_mul, normalization_dim);
     }
   }
 };
 
+template <typename OutputType, typename InputType, size_t Dims>
+SliceFlipNormalizePermuteGPU<OutputType, InputType, Dims>::SliceFlipNormalizePermuteGPU()
+: impl(new Impl()) {}
+
+template <typename OutputType, typename InputType, size_t Dims>
+KernelRequirements SliceFlipNormalizePermuteGPU<OutputType, InputType, Dims>::Setup(
+    KernelContext &context,
+    const InListGPU<InputType, Dims> &in,
+    const std::vector<Args> &args) {
+  return impl->Setup(context, in, args);
+}
+
+template <typename OutputType, typename InputType, size_t Dims>
+void SliceFlipNormalizePermuteGPU<OutputType, InputType, Dims>::Run(
+    KernelContext &context,
+    OutListGPU<OutputType, Dims> &out,
+    const InListGPU<InputType, Dims> &in,
+    const std::vector<Args> &args) {
+  impl->Run(context, out, in, args);
+}
+
 }  // namespace kernels
 }  // namespace dali
 
-#endif  // DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_H_
+#endif  // DALI_KERNELS_SLICE_SLICE_FLIP_NORMALIZE_PERMUTE_GPU_IMPL_H_
