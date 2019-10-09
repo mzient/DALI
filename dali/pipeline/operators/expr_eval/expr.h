@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_PIPELINE_OPERATORS_FUSED_CROP_MIRROR_NORMALIZE_H_
-#define DALI_PIPELINE_OPERATORS_FUSED_CROP_MIRROR_NORMALIZE_H_
 
-#include <unordered_map>
-#include <utility>
-#include "dali/pipeline/operators/operator.h"
+#ifndef DALI_PIPELINE_OPERATORS_EXPR_EVAL_EXPR_H_
+#define DALI_PIPELINE_OPERATORS_EXPR_EVAL_EXPR_H_
+
+#include <string>
+#include "dali/pipeline/data/types.h"
+#include "dali/kernels/tensor_shape.h"
 #include "dali/core/small_vector.h"
+#include "dali/pipeline/operators/expr_eval/value_info.h"
 
 namespace dali {
+namespace expr {
 
 enum class NodeType {
   Function,
@@ -29,10 +32,14 @@ enum class NodeType {
 };
 
 struct ExprNode {
+  // intrusive list chain pointer
   ExprNode *next = nullptr;
+
   virtual ~ExprNode() = default;
   virtual NodeType type() const noexcept = 0;
   virtual ExprNode *Clone() const = 0;
+
+  ValueInfo node_value_info;
 };
 
 struct FuncExprNode : ExprNode {
@@ -49,11 +56,14 @@ struct InputExprNode : ExprNode {
 };
 
 struct ConstantExprNode : ExprNode {
-  NodeType type() const noexcept override { return NodeType::Input; }
+  NodeType type() const noexcept override { return NodeType::Constant; }
   ConstantExprNode *Clone() const override { return new ConstantExprNode(*this); }
   double value;
 };
 
+/**
+ * @brief Describes an expression DAG
+ */
 struct Expression {
   ExprNode *root = nullptr;
   ExprNode *head = nullptr;
@@ -106,15 +116,11 @@ struct Expression {
     }
     return *this;
   }
+
+  void Parse(const char *expr_str);
 };
 
-template <typename Backend>
-class ArithExprOp : public Operator<Backend> {
- public:
-
-  Expression expr;
-};
-
+}  // namespace expr
 }  // namespace dali
 
-#endif  // DALI_PIPELINE_OPERATORS_FUSED_CROP_MIRROR_NORMALIZE_H_
+#endif  // DALI_PIPELINE_OPERATORS_EXPR_EVAL_EXPR_H_
