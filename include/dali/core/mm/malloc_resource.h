@@ -28,11 +28,14 @@ namespace mm {
  */
 class malloc_memory_resource : public host_memory_resource {
   void *do_allocate(size_t bytes, size_t alignment) override {
-    return memalign(alignment, bytes + sizeof(int));
+    void *mem = memalign(alignment, bytes + sizeof(int));
+    if (!mem)
+      throw std::bad_alloc();
+    return mem;
   }
 
   void do_deallocate(void *ptr, size_t bytes, size_t alignment) override {
-    return free(ptr);
+    free(ptr);
   }
 
   bool do_is_equal(const memory_resource &other) const noexcept override {
