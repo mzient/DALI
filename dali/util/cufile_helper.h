@@ -59,6 +59,8 @@ class DLL_PUBLIC CUFileHandle{
   int fdd;  // descriptor for direct IO
 };
 
+DLL_PUBLIC int GetMaxCUFileHandles();
+
 }  // namespace cufile
 
 #endif  // DALI_UTIL_CUFILE_HELPER_H_

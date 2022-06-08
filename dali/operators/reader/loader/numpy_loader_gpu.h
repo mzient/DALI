@@ -59,6 +59,8 @@ struct NumpyFileWrapperGPU {
 
   void Reopen();
 
+  void Close();
+
   const TensorShape<>& get_shape() const {
     return shape;
   }

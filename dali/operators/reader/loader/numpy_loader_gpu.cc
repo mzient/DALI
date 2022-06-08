@@ -27,7 +27,12 @@ void NumpyLoaderGPU::PrepareEmpty(NumpyFileWrapperGPU& target) {
 }
 
 void NumpyFileWrapperGPU::Reopen() {
-  file_stream = CUFileStream::Open(filename, read_ahead, false);
+  if (!file_stream)
+    file_stream = CUFileStream::Open(filename, read_ahead, false);
+}
+
+void NumpyFileWrapperGPU::Close() {
+  file_stream.reset();
 }
 
 void NumpyFileWrapperGPU::ReadHeader(detail::NumpyHeaderCache &cache) {

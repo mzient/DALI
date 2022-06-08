@@ -19,6 +19,7 @@
 #include "dali/operators/reader/numpy_reader_gpu_op.h"
 #include "dali/operators/reader/gds_mem.h"
 #include "dali/pipeline/data/views.h"
+#include "dali/util/cufile_helper.h"
 
 namespace dali {
 
@@ -50,11 +51,15 @@ void NumpyReaderGPU::Prefetch() {
   auto &curr_batch = prefetched_batch_queue_[curr_batch_producer_];
   auto &curr_tensor_list = prefetched_batch_tensors_[curr_batch_producer_];
 
+  bool close = static_cast<int>(curr_batch.size()) > cufile::GetMaxCUFileHandles();
+
   // get shapes
   for (size_t data_idx = 0; data_idx < curr_batch.size(); ++data_idx) {
-    thread_pool_.AddWork([this, &curr_batch, data_idx](int tid) {
+    thread_pool_.AddWork([this, &curr_batch, data_idx, close](int tid) {
         curr_batch[data_idx]->Reopen();
         curr_batch[data_idx]->ReadHeader(header_cache_);
+        if (close)
+          curr_batch[data_idx]->Close();
       });
   }
   thread_pool_.RunAll();
@@ -97,7 +102,7 @@ void NumpyReaderGPU::Prefetch() {
   CUDA_CALL(cudaEventRecord(staging_ready_, staging_stream_));
 
   for (int data_idx = 0; data_idx < curr_tensor_list.num_samples(); ++data_idx) {
-    curr_batch[data_idx]->file_stream->Close();
+    curr_batch[data_idx]->Close();
   }
 }
 
@@ -108,6 +113,8 @@ void NumpyReaderGPU::ScheduleChunkedRead(SampleView<GPUBackend> &out_sample,
                       TypeTable::GetTypeInfo(out_sample.type()).size();
   if (!data_bytes)
     return;  // empty array - short-circuit
+
+  load_target.Reopen();
 
   uint8_t *base_ptr = static_cast<uint8_t*>(out_sample.raw_mutable_data());
   uint8_t *dst_ptr = base_ptr;
