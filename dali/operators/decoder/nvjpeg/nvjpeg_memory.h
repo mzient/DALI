@@ -55,6 +55,11 @@ void AddHostBuffer(std::thread::id thread_id, size_t size);
 void DeleteAllBuffers(std::thread::id thread_id);
 
 /**
+ * @brief Registers a thread
+ */
+void RegisterThread(std::thread::id thread_id);
+
+/**
  * @brief Enables/disables nvJPEG allocation statistics collection
  */
 void SetEnableMemStats(bool enabled);

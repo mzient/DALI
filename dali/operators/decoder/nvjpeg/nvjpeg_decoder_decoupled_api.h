@@ -86,6 +86,18 @@ class nvJPEGDecoder : public Operator<MixedBackend>, CachedDecoderImpl {
                      spec.GetArgument<int>("device_id"),
                      spec.GetArgument<bool>("affine"),
                      "image decoder nvJPEG2k") {
+
+      // Free any remaining buffers and remove the thread entry from the global map
+      for (auto thread_id : thread_pool_.GetThreadIds()) {
+        nvjpeg_memory::RegisterThread(thread_id);
+      }
+
+#if NVJPEG2K_ENABLED
+      for (auto thread_id : nvjpeg2k_thread_.GetThreadIds()) {
+        nvjpeg_memory::RegisterThread(thread_id);
+      }
+#endif  // NVJPEG2K_ENABLED
+
 #if IS_HW_DECODER_COMPATIBLE
     // if hw_decoder_load is not present in the schema (crop/sliceDecoder) then it is not supported
     bool try_init_hw_decoder = false;

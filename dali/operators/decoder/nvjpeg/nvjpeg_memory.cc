@@ -76,6 +76,7 @@ namespace {
 struct NVJpegMem {
   BufferPool buffer_pool_;
   std::shared_timed_mutex buffer_pool_mutex_;
+  std::map<std::thread::id, bool> registered_;
 
   struct MemoryStats {
     size_t nallocs = 0;
@@ -129,6 +130,24 @@ struct NVJpegMem {
       auto &host_mem_stats = mem_stats_[static_cast<size_t>(mm::memory_kind_id::host)];
       out << "Host (regular) memory: " << host_mem_stats.nallocs
           << " allocations, largest = " << host_mem_stats.biggest_alloc << " bytes\n";
+      for (auto &[tid, pool] : buffer_pool_) {
+        bool empty = true;
+        for (auto &m : pool)
+          if (!m.empty()) {
+            empty = false;
+            break;
+          }
+        if (empty)
+          continue;
+        std::cerr << "TID: " << tid << "\n";
+        const char *mem_kind_name[] = { "Host", "Pinned", "Device", "Managed" };
+        for (int i = 0; i < (int)mm::memory_kind_id::count; i++) {
+          size_t size = 0;
+          for (auto &buf : pool[i])
+            size += buf.size;
+          std::cerr << mem_kind_name << ": " << size << " bytes in " << pool[i].size() << " allocations\n";
+        }
+      }
       out << "################## END NVJPEG STATS ##################" << std::endl;
     }
   }
@@ -213,6 +232,9 @@ struct NVJpegMem {
   void AddBuffer(std::thread::id thread_id, size_t size) {
     std::unique_lock<std::shared_timed_mutex> lock(buffer_pool_mutex_);
     auto kind = mm::kind2id_v<MemoryKind>;
+    if (!registered_[thread_id]) {
+      std::cerr << "Thread not registered: " << thread_id << "\n";
+    }
     auto& thread_buffer_pool = buffer_pool_[thread_id];
     lock.unlock();
 
@@ -224,6 +246,7 @@ struct NVJpegMem {
   void DeleteAllBuffers(std::thread::id thread_id) {
     std::shared_lock<std::shared_timed_mutex> lock(buffer_pool_mutex_);
     auto it = buffer_pool_.find(thread_id);
+    registered_[thread_id] = false;
     // no buffers have been preallocated/returned to the pool
     if (it == buffer_pool_.end()) {
       return;
@@ -233,6 +256,12 @@ struct NVJpegMem {
     for (auto &buffer : buffers)
       buffer.clear();
   }
+
+  void RegisterThread(std::thread::id thread_id) {
+    std::lock_guard lock(buffer_pool_mutex_);
+    registered_[thread_id] = true;
+  }
+
 };
 
 template <>
@@ -271,6 +300,10 @@ void *GetHostBuffer(std::thread::id thread_id, size_t size) {
 
 void DeleteAllBuffers(std::thread::id thread_id) {
   NVJpegMem::instance().DeleteAllBuffers(thread_id);
+}
+
+void RegisterThread(std::thread::id thread_id) {
+  NVJpegMem::instance().RegisterThread(thread_id);
 }
 
 template <typename MemoryKind>
