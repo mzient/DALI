@@ -45,7 +45,7 @@ dimension than the input, that is for ``FHWC`` inputs, the outputs will be ``HWC
 
 
 template <>
-void ElementExtract<CPUBackend>::RunCopies(HostWorkspace &ws) {
+void ElementExtract<CPUBackend>::RunCopies(Workspace &ws) {
   scatter_gather_.Run(ws.GetThreadPool(), true);
 }
 

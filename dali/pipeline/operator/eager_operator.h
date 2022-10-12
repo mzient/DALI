@@ -190,7 +190,7 @@ class DLL_PUBLIC EagerOperator {
 
   int max_batch_size_;
   size_t num_outputs_;
-  workspace_t<Backend> ws_;
+  Workspace ws_;
   OpSpec op_spec_;
   std::string name_;
   std::unique_ptr<OperatorBase> op_;
@@ -307,7 +307,7 @@ EagerOperator<Backend>::RunImpl(
   // Setup outputs.
   if (op_->Setup(output_desc, ws_) && op_->CanInferOutputs()) {
     for (size_t i = 0; i < num_outputs_; ++i) {
-      ws_.template Output<OutBackend>(i).Resize(output_desc[i].shape, output_desc[i].type,
+      ws_.Output<OutBackend>(i).Resize(output_desc[i].shape, output_desc[i].type,
                                                 BatchContiguity::Contiguous);
     }
   }

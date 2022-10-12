@@ -54,7 +54,7 @@ class DecoderBench : public DALIBenchmark {
     pipe.Build(outputs);
 
     // Run once to allocate the memory
-    DeviceWorkspace ws;
+    Workspace ws;
     pipe.SetExternalInput("raw_jpegs", data);
     pipe.RunCPU();
     pipe.RunGPU();

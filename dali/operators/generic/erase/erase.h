@@ -37,8 +37,8 @@ class Erase : public Operator<Backend> {
 
  protected:
   using Operator<Backend>::RunImpl;
-  void RunImpl(workspace_t<Backend> &ws) override;
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const workspace_t<Backend> &ws) override;
+  void RunImpl(Workspace &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
 
   bool CanInferOutputs() const override {
     return true;

@@ -42,7 +42,7 @@ void RunKernel(TensorList<GPUBackend> &output, const TensorList<GPUBackend> &inp
 }
 
 template <>
-void Flip<GPUBackend>::RunImpl(Workspace<GPUBackend> &ws) {
+void Flip<GPUBackend>::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<GPUBackend>(0);
   auto &output = ws.Output<GPUBackend>(0);
   output.SetLayout(input.GetLayout());

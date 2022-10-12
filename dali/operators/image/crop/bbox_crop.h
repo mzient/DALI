@@ -30,8 +30,8 @@ class RandomBBoxCrop : public Operator<Backend> {
   ~RandomBBoxCrop() override;
 
  protected:
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const workspace_t<Backend> &ws) override;
-  void RunImpl(workspace_t<Backend> &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
  private:
   std::unique_ptr<OpImplBase<Backend>> impl_;

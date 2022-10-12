@@ -39,12 +39,9 @@ class DLL_PUBLIC ResizeBase {
   void InitializeCPU(int num_threads);
   void InitializeGPU(int minibatch_size, size_t temp_buffer_hint = 0);
 
-  using Workspace = workspace_t<Backend>;
+  using Workspace = Workspace;
 
-  using InputBufferType =  typename Workspace::template input_t<Backend>::element_type;
-  using OutputBufferType = typename Workspace::template output_t<Backend>::element_type;
-
-  void RunResize(Workspace &ws, OutputBufferType &output, const InputBufferType &input);
+  void RunResize(Workspace &ws, TensorList<Backend> &output, const TensorList<Backend> &input);
 
   /**
    * @param ws                workspace object

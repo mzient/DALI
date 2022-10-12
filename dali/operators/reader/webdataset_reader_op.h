@@ -29,8 +29,8 @@ class DLL_PUBLIC WebdatasetReader : public DataReader<CPUBackend, vector<Tensor<
     loader_ = InitLoader<WebdatasetLoader>(spec);
   }
 
-  bool SetupImpl(std::vector<OutputDesc>& output_desc, const HostWorkspace&) override;
-  void RunImpl(HostWorkspace& ws) override;
+  bool SetupImpl(std::vector<OutputDesc>& output_desc, const Workspace&) override;
+  void RunImpl(Workspace &ws) override;
   bool CanInferOutputs() const override {
     return true;
   }

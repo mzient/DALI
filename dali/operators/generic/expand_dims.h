@@ -28,7 +28,7 @@ template <typename Backend>
 class ExpandDims : public Reshape<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = workspace_t<Backend>;
+  using Workspace = Workspace;
 
   explicit ExpandDims(const OpSpec &spec_);
 

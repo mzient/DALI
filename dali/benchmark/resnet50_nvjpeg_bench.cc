@@ -88,7 +88,7 @@ BENCHMARK_DEFINE_F(RealRN50, nvjpegPipe)(benchmark::State& st) { // NOLINT
   pipe.Build(outputs);
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);

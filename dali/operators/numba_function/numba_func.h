@@ -25,7 +25,7 @@ template <typename Backend>
 class NumbaFuncImpl : public Operator<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = workspace_t<Backend>;
+  using Workspace = Workspace;
 
   explicit NumbaFuncImpl(const OpSpec &spec_);
 

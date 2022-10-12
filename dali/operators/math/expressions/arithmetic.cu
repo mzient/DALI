@@ -18,7 +18,7 @@
 namespace dali {
 
 template <>
-void ArithmeticGenericOp<GPUBackend>::RunImpl(DeviceWorkspace &ws) {
+void ArithmeticGenericOp<GPUBackend>::RunImpl(Workspace &ws) {
   PrepareTilesForTasks<GPUBackend>(tiles_per_task_, exec_order_, tile_cover_, ws, constant_storage_,
                                    spec_);
   ws.Output<GPUBackend>(0).SetLayout(result_layout_);

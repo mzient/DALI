@@ -88,7 +88,7 @@ void FillTensorList(
 }  // namespace
 
 template <>
-void Constant<GPUBackend>::RunImpl(DeviceWorkspace &ws) {
+void Constant<GPUBackend>::RunImpl(Workspace &ws) {
   if (output_.num_samples() == 0) {
     TYPE_SWITCH(output_type_, type2id, type, CONSTANT_OP_SUPPORTED_TYPES,
       (

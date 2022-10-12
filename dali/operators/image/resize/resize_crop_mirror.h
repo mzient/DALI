@@ -217,7 +217,7 @@ class ResizeCropMirror : public Operator<CPUBackend>, protected ResizeCropMirror
   ~ResizeCropMirror() override = default;
 
  protected:
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const HostWorkspace &ws) override {
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override {
     return false;
   }
 

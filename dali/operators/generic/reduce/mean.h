@@ -47,8 +47,8 @@ class MeanOp : public Reduce<ReductionType, Backend, MeanOp> {
     return DALI_FLOAT;
   }
 
-  void RunImplImpl(workspace_t<Backend> &ws) {
-    auto& in = ws.template Input<Backend>(0);
+  void RunImplImpl(Workspace &ws) {
+    auto& in = ws.Input<Backend>(0);
     DALIDataType input_type = in.type();
     DALIDataType output_type = this->OutputType(input_type);
 

@@ -17,7 +17,7 @@
 namespace dali {
 
 template <>
-void Copy<CPUBackend>::RunCopies(HostWorkspace &ws) {
+void Copy<CPUBackend>::RunCopies(Workspace &ws) {
   scatter_gather_.Run(ws.GetThreadPool(), true);
 }
 

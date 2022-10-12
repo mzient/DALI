@@ -19,7 +19,7 @@
 namespace dali {
 
 template <>
-void ElementExtract<GPUBackend>::RunCopies(DeviceWorkspace &ws) {
+void ElementExtract<GPUBackend>::RunCopies(Workspace &ws) {
   scatter_gather_.Run(ws.stream(), true);
 }
 

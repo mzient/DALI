@@ -29,7 +29,7 @@ void RandomResizedCrop<GPUBackend>::BackendInit() {
 }
 
 template<>
-void RandomResizedCrop<GPUBackend>::RunImpl(DeviceWorkspace &ws) {
+void RandomResizedCrop<GPUBackend>::RunImpl(Workspace &ws) {
   auto &input = ws.Input<GPUBackend>(0);
   auto &output = ws.Output<GPUBackend>(0);
   RunResize(ws, output, input);

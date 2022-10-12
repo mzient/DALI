@@ -65,7 +65,7 @@ class FileListHarness {
     Pipeline pipeline(batch_size_, 4, device_id_);
     SetupPipeline(pipeline);
 
-    DeviceWorkspace ws;
+    Workspace ws;
     pipeline.RunCPU();
     pipeline.RunGPU();
     pipeline.Outputs(&ws);

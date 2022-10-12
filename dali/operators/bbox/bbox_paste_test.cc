@@ -55,7 +55,7 @@ class BBoxPasteTest<std::integral_constant<bool, ltrb>> : public DALISingleOpTes
 
   vector<std::shared_ptr<TensorList<CPUBackend>>>
   Reference(const vector<TensorList<CPUBackend>*> &inputs,
-            DeviceWorkspace *ws) override {
+            Workspace *ws) override {
     (void)inputs;
     (void)ws;
     auto ref = ToTensorList(output_);

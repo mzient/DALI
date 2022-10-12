@@ -59,17 +59,17 @@ class ExecutorTest : public GenericDecoderTest<RGB> {
   }
 
   // TODO(klecki): adjust to refactored code
-  vector<HostWorkspace> CPUData(ExecutorBase *exe, int idx) const {
+  vector<Workspace> CPUData(ExecutorBase *exe, int idx) const {
     // return std::get<static_cast<int>(OpType::CPU)>(exe->wss_[idx].op_data);
     return {};
   }
 
-  vector<MixedWorkspace> MixedData(ExecutorBase *exe, int idx) const {
+  vector<Workspace> MixedData(ExecutorBase *exe, int idx) const {
     // return std::get<static_cast<int>(OpType::MIXED)>(exe->wss_[idx].op_data);
     return {};
   }
 
-  vector<DeviceWorkspace> GPUData(ExecutorBase *exe, int idx) const {
+  vector<Workspace> GPUData(ExecutorBase *exe, int idx) const {
     // return std::get<static_cast<int>(OpType::GPU)>(exe->wss_[idx].op_data);
     return {};
   }
@@ -363,7 +363,7 @@ TYPED_TEST(ExecutorTest, DISABLED_TestDataSetup) {
   for (int i = 0; i < 2; ++i) {
     auto host_workspaces = this->CPUData(exe.get(), i);
     ASSERT_EQ(host_workspaces.size(), 1);
-    HostWorkspace &hws = host_workspaces[0];
+    Workspace &hws = host_workspaces[0];
     ASSERT_EQ(hws.NumInput(), 0);
     ASSERT_EQ(hws.NumOutput(), 1);
     ASSERT_EQ(hws.GetRequestedBatchSize(0), this->batch_size_);
@@ -371,7 +371,7 @@ TYPED_TEST(ExecutorTest, DISABLED_TestDataSetup) {
 
     auto mixed_workspaces = this->MixedData(exe.get(), i);
     ASSERT_EQ(mixed_workspaces.size(), 1);
-    MixedWorkspace &mws = mixed_workspaces[0];
+    Workspace &mws = mixed_workspaces[0];
     ASSERT_EQ(mws.NumInput(), 1);
     ASSERT_EQ(mws.GetInputBatchSize(0), this->batch_size_);
     ASSERT_TRUE(mws.InputIsType<CPUBackend>(0));
@@ -380,7 +380,7 @@ TYPED_TEST(ExecutorTest, DISABLED_TestDataSetup) {
 
     auto device_workspaces = this->GPUData(exe.get(), i);
     ASSERT_EQ(device_workspaces.size(), 1);
-    DeviceWorkspace &dws = device_workspaces[0];
+    Workspace &dws = device_workspaces[0];
     ASSERT_EQ(dws.NumInput(), 1);
     ASSERT_TRUE(dws.InputIsType<GPUBackend>(0));
     ASSERT_EQ(dws.NumOutput(), 1);
@@ -427,7 +427,7 @@ TYPED_TEST(ExecutorTest, TestRunBasicGraph) {
   exe->RunMixed();
   exe->RunGPU();
 
-  DeviceWorkspace ws;
+  Workspace ws;
   exe->Outputs(&ws);
   ASSERT_EQ(ws.NumOutput(), 1);
   ASSERT_EQ(ws.NumInput(), 0);
@@ -481,7 +481,7 @@ TYPED_TEST(ExecutorTest, TestRunBasicGraphWithCB) {
   exe->RunMixed();
   exe->RunGPU();
 
-  DeviceWorkspace ws;
+  Workspace ws;
   exe->Outputs(&ws);
   ASSERT_EQ(ws.NumInput(), 0);
   ASSERT_EQ(ws.NumOutput(), 1);
@@ -586,7 +586,7 @@ TYPED_TEST(ExecutorSyncTest, TestPrefetchedExecution) {
   exe->RunMixed();
   exe->RunGPU();
 
-  DeviceWorkspace ws;
+  Workspace ws;
   exe->Outputs(&ws);
   ASSERT_EQ(ws.NumOutput(), 1);
   ASSERT_EQ(ws.NumInput(), 0);
@@ -688,7 +688,7 @@ TYPED_TEST(ExecutorTest, TestPinning) {
   exe->RunMixed();
   exe->RunGPU();
 
-  DeviceWorkspace ws;
+  Workspace ws;
   exe->Outputs(&ws);
 
   // Utilize the fact that the outputs are shared from the executor, so we can check if they are

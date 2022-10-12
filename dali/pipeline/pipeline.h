@@ -353,7 +353,7 @@ class DLL_PUBLIC Pipeline {
    * must be called prior to calling this or this method will result in
    * deadlock.
    */
-  DLL_PUBLIC void Outputs(DeviceWorkspace *ws);
+  DLL_PUBLIC void Outputs(Workspace *ws);
 
   /**
    * @brief Fills the input device workspace with the output of the pipeline.
@@ -362,7 +362,7 @@ class DLL_PUBLIC Pipeline {
    * must be called prior to calling this or this method will result in
    * deadlock.
    */
-  DLL_PUBLIC void ShareOutputs(DeviceWorkspace *ws);
+  DLL_PUBLIC void ShareOutputs(Workspace *ws);
 
   /**
    * @brief Release buffers returned by the Output call
@@ -549,7 +549,7 @@ class DLL_PUBLIC Pipeline {
    * Validate, that the outputs from the Pipeline match the criteria.
    * @return True, if the outputs passed the validation test.
    */
-  bool ValidateOutputs(const DeviceWorkspace &ws) const;
+  bool ValidateOutputs(const Workspace &ws) const;
 
   /**
    * @brief Prepare the OpSpec and generate operator name and output name for a specified

@@ -29,7 +29,7 @@ DALI_SCHEMA(ColorSpaceConversion)
     .SupportVolumetric();
 
 template <>
-void ColorSpaceConversion<CPUBackend>::RunImpl(HostWorkspace &ws) {
+void ColorSpaceConversion<CPUBackend>::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   output.SetLayout(input.GetLayout());

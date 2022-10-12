@@ -36,7 +36,7 @@ class HostDecoder : public Operator<CPUBackend> {
   DISABLE_COPY_MOVE_ASSIGN(HostDecoder);
 
  protected:
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const HostWorkspace &ws) override {
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override {
     return false;
   }
 

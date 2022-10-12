@@ -169,7 +169,7 @@ TEST(ArgValueTests, Constant_0D) {
   int nsamples = 5;
   auto spec = OpSpec("ArgHelperTestOp").AddArg("scalar", 0.123f);
   ArgValue<float, 0> arg("scalar", spec);
-  workspace_t<CPUBackend> ws;
+  Workspace ws;
   arg.Acquire(spec, ws, nsamples);
   ASSERT_TRUE(arg.HasExplicitConstant());
   ASSERT_EQ(TensorShape<0>{}, arg[0].shape);
@@ -188,7 +188,7 @@ TEST(ArgValueTests, Constant_1D) {
   TensorShape<1> expected_shape{3};
   auto spec = OpSpec("ArgHelperTestOp").AddArg("arg", data);
   ArgValue<float, 1> arg("arg", spec);
-  workspace_t<CPUBackend> ws;
+  Workspace ws;
   arg.Acquire(spec, ws, nsamples, ArgValue_EnforceUniform);
   ASSERT_TRUE(arg.HasExplicitConstant());
   for (int i = 0; i < kNumSamples; i++) {
@@ -206,7 +206,7 @@ TEST(ArgValueTests, Constant_2D) {
   auto spec =
     OpSpec("ArgHelperTestOp")
       .AddArg("arg", data);
-  workspace_t<CPUBackend> ws;
+  Workspace ws;
 
   auto shape_from_size =
     [](int64_t size) {

@@ -65,7 +65,7 @@ std::unique_ptr<ExprImplBase> ExprImplFactoryCpuTernary(const ExprFunc &expr) {
   return result;
 }
 
-std::unique_ptr<ExprImplBase> ExprImplFactory(const HostWorkspace &ws, const ExprNode &expr) {
+std::unique_ptr<ExprImplBase> ExprImplFactory(const Workspace &ws, const ExprNode &expr) {
   DALI_ENFORCE(expr.GetNodeType() == NodeType::Function, "Only function nodes can be executed.");
 
   switch (expr.GetSubexpressionCount()) {

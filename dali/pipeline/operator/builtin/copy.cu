@@ -18,7 +18,7 @@
 namespace dali {
 
 template <>
-void Copy<GPUBackend>::RunCopies(DeviceWorkspace &ws) {
+void Copy<GPUBackend>::RunCopies(Workspace &ws) {
   scatter_gather_.Run(ws.stream(), true);
 }
 

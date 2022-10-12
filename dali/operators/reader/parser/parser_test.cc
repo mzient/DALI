@@ -72,7 +72,7 @@ TYPED_TEST(ParserTest, BasicTest) {
   data[1] = W;
   data[2] = C;
 
-  HostWorkspace workspace;
+  Workspace workspace;
   SampleWorkspace ws;
 
   MakeSampleView(ws, workspace, 0, 0);

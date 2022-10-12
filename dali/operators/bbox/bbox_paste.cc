@@ -55,7 +55,7 @@ canvas and ``(1,1)`` aligns it to bottom-right.
       0.5f, true);
 
 template<>
-void BBoxPaste<CPUBackend>::RunImpl(Workspace<CPUBackend> &ws) {
+void BBoxPaste<CPUBackend>::RunImpl(SampleWorkspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   const auto input_data = input.data<float>();
 

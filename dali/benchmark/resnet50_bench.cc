@@ -106,7 +106,7 @@ BENCHMARK_DEFINE_F(RN50, C2Pipe)(benchmark::State& st) { // NOLINT
   pipe.SetExternalInput("raw_jpegs", data);
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);
@@ -241,7 +241,7 @@ BENCHMARK_DEFINE_F(RN50, HybridPipe)(benchmark::State& st) { // NOLINT
 
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);
@@ -354,7 +354,7 @@ BENCHMARK_DEFINE_F(RN50, nvJPEGPipe)(benchmark::State& st) { // NOLINT
   pipe.SetExternalInput("raw_jpegs", data);
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);

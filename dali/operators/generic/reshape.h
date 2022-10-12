@@ -28,7 +28,7 @@ template <typename Backend>
 class Reshape : public Operator<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = workspace_t<Backend>;
+  using Workspace = Workspace;
 
   explicit Reshape(const OpSpec &spec_);
 
@@ -53,7 +53,7 @@ class Reshape : public Operator<Backend> {
   inline void SetOutputType(const Workspace &ws) {
     output_type_ = output_type_arg_ != DALI_NO_TYPE
       ? &TypeTable::GetTypeInfo(output_type_arg_)
-      : &ws.template Input<Backend>(0).type_info();
+      : &ws.Input<Backend>(0).type_info();
   }
 
   std::vector<int> src_dims_;

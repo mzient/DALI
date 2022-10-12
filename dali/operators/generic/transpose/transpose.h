@@ -72,8 +72,8 @@ class Transpose : public Operator<Backend> {
   }
 
   bool SetupImpl(std::vector<OutputDesc> &output_desc,
-                 const workspace_t<Backend> &ws) override {
-    const auto &input = ws.template Input<Backend>(0);
+                 const Workspace &ws) override {
+    const auto &input = ws.Input<Backend>(0);
     SetOutputLayout(input);
 
     const auto &input_shape = input.shape();

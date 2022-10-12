@@ -32,7 +32,7 @@ class nvJPEGDecoderSlice : public nvJPEGDecoder {
 
  protected:
   using OperatorBase::Run;
-  void Run(MixedWorkspace &ws) override {
+  void Run(Workspace &ws) override {
     slice_attr_.ProcessArguments<MixedBackend>(spec_, ws);
     nvJPEGDecoder::Run(ws);
   }

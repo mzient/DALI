@@ -105,7 +105,7 @@ BENCHMARK_DEFINE_F(Alexnet, CaffePipe)(benchmark::State& st) { // NOLINT
   string serialized = pipe.SerializeToProtobuf();
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);
@@ -236,7 +236,7 @@ BENCHMARK_DEFINE_F(Alexnet, HybridPipe)(benchmark::State& st) { // NOLINT
   pipe.Build(outputs);
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);

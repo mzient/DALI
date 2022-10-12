@@ -43,7 +43,7 @@ void RandomResizedCrop<CPUBackend>::BackendInit() {
 }
 
 template<>
-void RandomResizedCrop<CPUBackend>::RunImpl(HostWorkspace &ws) {
+void RandomResizedCrop<CPUBackend>::RunImpl(Workspace &ws) {
   auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
 

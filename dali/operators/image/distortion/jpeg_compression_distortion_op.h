@@ -37,8 +37,8 @@ class JpegCompressionDistortion : public Operator<Backend> {
     return true;
   }
 
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const workspace_t<Backend> &ws) override {
-    const auto &input = ws.template Input<Backend>(0);
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override {
+    const auto &input = ws.Input<Backend>(0);
     output_desc.resize(1);
     const auto &in_sh = input.shape();
     assert(in_sh.sample_dim() == 3 || in_sh.sample_dim() == 4);  // should be check by the layout

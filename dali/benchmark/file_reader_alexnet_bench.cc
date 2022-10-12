@@ -105,7 +105,7 @@ BENCHMARK_DEFINE_F(FileReaderAlexnet, CaffePipe)(benchmark::State& st) { // NOLI
   string serialized = pipe.SerializeToProtobuf();
 
   // Run once to allocate the memory
-  DeviceWorkspace ws;
+  Workspace ws;
   pipe.RunCPU();
   pipe.RunGPU();
   pipe.Outputs(&ws);

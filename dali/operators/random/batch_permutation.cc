@@ -30,7 +30,7 @@ indexing samples in the batch.)")
   .AddOptionalArg("no_fixed_points", R"(If true, the the output permutation cannot contain fixed
 points, that is ``out[i] != i``. This argument is ignored when batch size is 1.)", false);
 
-void BatchPermutation::RunImpl(HostWorkspace &ws) {
+void BatchPermutation::RunImpl(Workspace &ws) {
   auto &output = ws.Output<CPUBackend>(0);
   int N = ws.GetRequestedBatchSize(0);
   if (N < 1)
