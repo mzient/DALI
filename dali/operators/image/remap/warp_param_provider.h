@@ -100,7 +100,6 @@ template <typename Backend, int spatial_ndim, typename MappingParams, typename B
 class WarpParamProvider : public InterpTypeProvider, public BorderTypeProvider<BorderType> {
  public:
   using SpatialShape = TensorShape<spatial_ndim>;
-  using Workspace = Workspace;
 
   virtual ~WarpParamProvider() = default;
 

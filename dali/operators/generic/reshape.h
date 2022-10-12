@@ -28,7 +28,6 @@ template <typename Backend>
 class Reshape : public Operator<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = Workspace;
 
   explicit Reshape(const OpSpec &spec_);
 

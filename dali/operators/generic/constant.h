@@ -30,7 +30,6 @@ template <typename Backend>
 class Constant : public Operator<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = Workspace;
 
   explicit Constant(const OpSpec &spec) : Operator<Backend>(spec) {
     bool has_shape = spec.ArgumentDefined("shape");

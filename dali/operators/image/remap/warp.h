@@ -77,7 +77,6 @@ class WarpOpImpl : public OpImplInterface<Backend> {
   static constexpr int spatial_ndim = Kernel::spatial_ndim;
   static constexpr int tensor_ndim = Kernel::tensor_ndim;
   using ParamProvider = WarpParamProvider<Backend, spatial_ndim, MappingParams, BorderType>;
-  using Workspace = Workspace;
 
   /**
    * @param spec  Pointer to a persistent OpSpec object,
@@ -229,7 +228,6 @@ class Warp : public SequenceOperator<Backend> {
   using MyType = Derived;
   MyType &This() { return static_cast<MyType&>(*this); }
   const MyType &This() const { return static_cast<const MyType&>(*this); }
-  using Workspace = Workspace;
   using SequenceOperator<Backend>::IsExpanding;
   using SequenceOperator<Backend>::GetInputExpandDesc;
 

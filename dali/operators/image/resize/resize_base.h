@@ -39,8 +39,6 @@ class DLL_PUBLIC ResizeBase {
   void InitializeCPU(int num_threads);
   void InitializeGPU(int minibatch_size, size_t temp_buffer_hint = 0);
 
-  using Workspace = Workspace;
-
   void RunResize(Workspace &ws, TensorList<Backend> &output, const TensorList<Backend> &input);
 
   /**

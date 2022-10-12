@@ -28,7 +28,6 @@ template <typename Backend>
 class Squeeze : public Reshape<Backend> {
  public:
   using Base = Operator<Backend>;
-  using Workspace = Workspace;
 
   explicit Squeeze(const OpSpec &spec_);
 
