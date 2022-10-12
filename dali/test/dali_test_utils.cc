@@ -25,7 +25,7 @@
 #include "dali/core/error_handling.h"
 #include "dali/pipeline/data/backend.h"
 #include "dali/pipeline/data/views.h"
-#include "dali/pipeline/workspace/device_workspace.h"
+#include "dali/pipeline/workspace/workspace.h"
 #include "dali/test/tensor_test_utils.h"
 
 namespace dali {

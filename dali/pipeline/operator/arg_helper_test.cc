@@ -15,7 +15,6 @@
 #include "dali/pipeline/operator/arg_helper.h"
 #include <gtest/gtest.h>
 #include "dali/pipeline/operator/op_spec.h"
-#include "dali/pipeline/util/backend2workspace_map.h"
 #include "dali/pipeline/workspace/workspace.h"
 
 namespace dali {

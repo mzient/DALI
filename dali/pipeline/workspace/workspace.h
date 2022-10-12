@@ -430,7 +430,7 @@ class WorkspaceBase : public ArgumentWorkspace {
   }
 
   inline bool has_event() const {
-    return event_;
+    return event_ != nullptr;
   }
 
   /**
@@ -681,7 +681,7 @@ class WorkspaceBase : public ArgumentWorkspace {
 
   AccessOrder output_order_ = AccessOrder::host();
   ThreadPool *thread_pool_ = nullptr;
-  cudaEvent_t event_;
+  cudaEvent_t event_ = nullptr;
   SmallVector<cudaEvent_t, 4> parent_events_;
 };
 

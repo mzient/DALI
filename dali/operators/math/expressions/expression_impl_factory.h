@@ -226,18 +226,14 @@ void PrepareTilesForTasks(std::vector<std::vector<ExtendedTileDesc>> &tiles_per_
 /**
  * @brief Convert runtime expression tree `expr` to an executor for this expression by doing
  *        a static type switch over the `expr` data. CPU variant.
- *
- * @param ws Workspace to disambiguate over backend.
  */
-std::unique_ptr<ExprImplBase> ExprImplFactory(const Workspace &ws, const ExprNode &expr);
+std::unique_ptr<ExprImplBase> ExprImplFactory(const ExprNode &expr, CPUBackend);
 
 /**
  * @brief Convert runtime expression tree `expr` to an executor for this expression by doing
  *        a static type switch over the `expr` data. GPU variant.
- *
- * @param ws Workspace to disambiguate over backend.
  */
-std::unique_ptr<ExprImplBase> ExprImplFactory(const Workspace &ws, const ExprNode &expr);
+std::unique_ptr<ExprImplBase> ExprImplFactory(const ExprNode &expr, GPUBackend);
 
 struct ExprImplCache {
   template <typename Backend>
@@ -247,7 +243,7 @@ struct ExprImplCache {
     if (it != cache_.end()) {
       return it->second.get();
     }
-    auto new_impl = ExprImplFactory(Workspace{}, expr);
+    auto new_impl = ExprImplFactory(expr, Backend{});
     auto ptr = std::shared_ptr<ExprImplBase>(std::move(new_impl));
     cache_[node_desc] = ptr;
     return ptr.get();

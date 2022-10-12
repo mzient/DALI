@@ -137,7 +137,7 @@ class DataReader : public Operator<Backend> {
   using Operator<Backend>::Run;
 
   // CPUBackend operators
-  void Run(Workspace &ws) override {
+  void RunBackend(Workspace &ws, CPUBackend) {
     // consume batch
     DomainTimeRange tr("[DALI][DataReader] Run #" + to_string(curr_batch_consumer_),
                        DomainTimeRange::kViolet);
@@ -176,7 +176,7 @@ class DataReader : public Operator<Backend> {
 
 
   // GPUBackend operators
-  void Run(Workspace &ws) override {
+  void RunBackend(Workspace &ws, GPUBackend) {
     // Consume batch
     Operator<Backend>::Run(ws);
     CUDA_CALL(cudaStreamSynchronize(ws.stream()));
@@ -185,6 +185,10 @@ class DataReader : public Operator<Backend> {
 
     // Notify we have consumed a batch
     ConsumerAdvanceQueue();
+  }
+
+  void Run(Workspace &ws) override {
+    RunBackend(ws, Backend{});
   }
 
   ReaderMeta GetReaderMeta() const override {

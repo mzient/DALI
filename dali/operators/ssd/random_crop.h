@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2017-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,8 +59,8 @@ class SSDRandomCrop : public Operator<Backend> {
     return false;
   }
 
-  void RunImpl(Workspace<Backend> &ws) override;
-  void SetupSharedSampleParams(Workspace<Backend> &ws) override;
+  void RunImpl(legacy_workspace_t<Backend> &ws) override;
+  void SetupSharedSampleParams(legacy_workspace_t<Backend> &ws) override;
 
  private:
   struct CropInfo {

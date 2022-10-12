@@ -131,7 +131,7 @@ class OpticalFlow : public Operator<Backend> {
     return true;
   }
 
-  void RunImpl(Workspace<Backend> &ws) override;
+  void RunImpl(Workspace &ws) override;
 
   bool CanInferOutputs() const override {
     return true;

@@ -19,7 +19,7 @@
 #include "dali/core/tensor_shape.h"
 #include "dali/pipeline/data/backend.h"
 #include "dali/pipeline/data/tensor.h"
-#include "dali/pipeline/workspace/device_workspace.h"
+#include "dali/pipeline/workspace/workspace.h"
 
 
 template <typename Enum>

@@ -30,7 +30,6 @@
 #include "dali/pipeline/data/types.h"
 #include "dali/pipeline/operator/op_spec.h"
 #include "dali/pipeline/operator/operator.h"
-#include "dali/pipeline/util/backend2workspace_map.h"
 #include "dali/pipeline/util/batch_utils.h"
 #include "dali/pipeline/util/thread_pool.h"
 #include "dali/pipeline/workspace/workspace.h"
