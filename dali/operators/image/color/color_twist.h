@@ -210,10 +210,10 @@ class ColorTwistCpu : public ColorTwistBase<CPUBackend> {
   DISABLE_COPY_MOVE_ASSIGN(ColorTwistCpu);
 
  protected:
-  void RunImpl(Workspace  &ws) override;
+  void RunImpl(Workspace &ws) override;
 
   template <typename OutputType, typename InputType, int ndim>
-  void RunImplHelper(Workspace  &ws);
+  void RunImplHelper(Workspace &ws);
 };
 
 

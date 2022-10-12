@@ -67,7 +67,7 @@ The supported values are:
 
 template <>
 bool MelFilterBank<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                          const Workspace  &ws) {
+                                          const Workspace &ws) {
   output_desc.resize(kNumOutputs);
   const auto &input = ws.Input<CPUBackend>(0);
   auto in_shape = input.shape();
@@ -92,7 +92,7 @@ bool MelFilterBank<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void MelFilterBank<CPUBackend>::RunImpl(Workspace  &ws) {
+void MelFilterBank<CPUBackend>::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   auto in_shape = input.shape();

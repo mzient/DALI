@@ -36,8 +36,8 @@ class SliceBaseCpu : public OpImplBase<CPUBackend> {
   using Kernel = kernels::SliceCPU<OutputType, InputType, Dims>;
   using SliceArgs = kernels::SliceArgs<OutputType, Dims>;
 
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
   std::vector<SliceArgs>& Args() { return args_; }
 
@@ -47,7 +47,7 @@ class SliceBaseCpu : public OpImplBase<CPUBackend> {
 
 template <typename OutputType, typename InputType, int Dims>
 bool SliceBaseCpu<OutputType, InputType, Dims>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                                          const Workspace  &ws) {
+                                                          const Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto in_shape = input.shape();
   int nsamples = in_shape.num_samples();
@@ -68,7 +68,7 @@ bool SliceBaseCpu<OutputType, InputType, Dims>::SetupImpl(std::vector<OutputDesc
 }
 
 template <typename OutputType, typename InputType, int Dims>
-void SliceBaseCpu<OutputType, InputType, Dims>::RunImpl(Workspace  &ws) {
+void SliceBaseCpu<OutputType, InputType, Dims>::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   output.SetLayout(input.GetLayout());
@@ -92,7 +92,7 @@ void SliceBaseCpu<OutputType, InputType, Dims>::RunImpl(Workspace  &ws) {
 
 template <>
 bool SliceBase<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                      const Workspace  &ws) {
+                                      const Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto input_type = input.type();
   auto ndim = input.shape().sample_dim();
@@ -126,7 +126,7 @@ bool SliceBase<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void SliceBase<CPUBackend>::RunImpl(Workspace  &ws) {
+void SliceBase<CPUBackend>::RunImpl(Workspace &ws) {
   assert(impl_ != nullptr);
   impl_->RunImpl(ws);
 }

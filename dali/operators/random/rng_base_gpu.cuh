@@ -125,7 +125,7 @@ __global__ void RNGKernel(SampleDesc* __restrict__ sample_descs,
 
 template <typename Backend, typename Impl, bool IsNoiseGen>
 template <typename T, typename Dist>
-void RNGBase<Backend, Impl, IsNoiseGen>::RunImplTyped(Workspace &ws) {
+void RNGBase<Backend, Impl, IsNoiseGen>::RunImplTyped(Workspace &ws, GPUBackend) {
   static_assert(std::is_same<Backend, GPUBackend>::value, "Unexpected backend");
   auto &output = ws.Output<GPUBackend>(0);
   auto rngs = backend_data_.randomizer_.states();

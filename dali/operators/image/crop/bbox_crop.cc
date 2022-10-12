@@ -42,7 +42,7 @@ template <int ndim>
 void CollectShape(std::vector<i64vec<ndim>> &v,
                   const std::string &name,
                   const OpSpec& spec,
-                  const Workspace  &ws,
+                  const Workspace &ws,
                   span<const int> perm) {
   int batch_size = spec.GetArgument<int>("max_batch_size");
   v.clear();
@@ -489,7 +489,7 @@ class RandomBBoxCropImpl : public OpImplBase<CPUBackend> {
                   "` or `", default_bbox_layout_start_shape, "`. Got: `", bbox_layout_, "`"));
   }
 
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override {
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override {
     if (has_input_shape_ || has_crop_shape_) {
       // Converting the shapes to "WHD" or "WH" if necessary
       auto default_shape_layout = InternalShapeLayout(ndim);
@@ -508,7 +508,7 @@ class RandomBBoxCropImpl : public OpImplBase<CPUBackend> {
     return false;
   }
 
-  void RunImpl(Workspace  &ws) override {
+  void RunImpl(Workspace &ws) override {
     const auto &in_boxes = ws.Input<CPUBackend>(0);
     auto in_boxes_view = view<const float>(in_boxes);
     auto in_boxes_shape = in_boxes_view.shape;
@@ -903,7 +903,7 @@ RandomBBoxCrop<CPUBackend>::RandomBBoxCrop(const OpSpec &spec)
 
 template <>
 bool RandomBBoxCrop<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                           const Workspace  &ws) {
+                                           const Workspace &ws) {
   const auto &boxes = ws.Input<CPUBackend>(0);
   auto tl_shape = boxes.shape();
   DALI_ENFORCE(tl_shape.sample_dim() == 2, make_string(
@@ -933,7 +933,7 @@ bool RandomBBoxCrop<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void RandomBBoxCrop<CPUBackend>::RunImpl(Workspace  &ws) {
+void RandomBBoxCrop<CPUBackend>::RunImpl(Workspace &ws) {
   assert(impl_ != nullptr);
   impl_->RunImpl(ws);
 }

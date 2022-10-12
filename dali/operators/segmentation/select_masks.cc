@@ -86,7 +86,7 @@ in ``mask_ids`` input.)code",
       false);
 
 bool SelectMasksCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
-                              const Workspace  &ws) {
+                              const Workspace &ws) {
   const auto &in_mask_ids = ws.Input<CPUBackend>(0);
   auto in_mask_ids_shape = in_mask_ids.shape();
   DALI_ENFORCE(in_mask_ids.type() == DALI_INT32, "``mask_ids`` input is expected to be int32");
@@ -192,7 +192,7 @@ bool SelectMasksCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <typename T>
-void SelectMasksCPU::RunImplTyped(Workspace  &ws) {
+void SelectMasksCPU::RunImplTyped(Workspace &ws) {
   // Inputs were already validated and input 0 was already parsed in SetupImpl
   const auto &in_polygons = ws.Input<CPUBackend>(1);
   const auto &in_polygons_view = view<const int32_t, 2>(in_polygons);
@@ -230,7 +230,7 @@ void SelectMasksCPU::RunImplTyped(Workspace  &ws) {
   }
 }
 
-void SelectMasksCPU::RunImpl(Workspace  &ws) {
+void SelectMasksCPU::RunImpl(Workspace &ws) {
   const auto &in_vertices = ws.Input<CPUBackend>(2);
   VALUE_SWITCH(in_vertices.type_info().size(), dtype_sz, (1, 2, 4, 8, 16), (
     using T = kernels::type_of_size<dtype_sz>;

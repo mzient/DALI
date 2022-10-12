@@ -61,7 +61,7 @@ class TransformBaseOp : public SequenceOperator<Backend, true> {
   const TransformImpl &This() const noexcept { return static_cast<const TransformImpl&>(*this); }
 
  protected:
-  void CheckInputShape(const Workspace  &ws) {
+  void CheckInputShape(const Workspace &ws) {
     if (has_input_) {
       auto in_t_ndim = input_transform_ndim(ws);
       DALI_ENFORCE(in_t_ndim == ndim_,

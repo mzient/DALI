@@ -60,7 +60,7 @@ class CombineTransformsCPU : public SequenceOperator<CPUBackend> {
 
  protected:
   bool SetupImpl(std::vector<OutputDesc> &output_descs,
-                 const Workspace  &ws) override {
+                 const Workspace &ws) override {
     assert(ws.NumInput() > 1);
     TensorListShape<> in0_shape = ws.Input<CPUBackend>(0).shape();
     ndim_ = in0_shape[0][0];
@@ -87,12 +87,12 @@ class CombineTransformsCPU : public SequenceOperator<CPUBackend> {
   }
 
   template <typename T>
-  void RunImplTyped(Workspace  &ws, dims<>) {
+  void RunImplTyped(Workspace &ws, dims<>) {
     DALI_FAIL(make_string("Unsupported number of dimensions ", ndim_));
   }
 
   template <typename T, int ndim, int... ndims>
-  void RunImplTyped(Workspace  &ws, dims<ndim, ndims...>) {
+  void RunImplTyped(Workspace &ws, dims<ndim, ndims...>) {
     if (ndim_ != ndim) {
       RunImplTyped<T>(ws, dims<ndims...>());
       return;
@@ -147,13 +147,13 @@ class CombineTransformsCPU : public SequenceOperator<CPUBackend> {
     }
   }
 
-  void RunImpl(Workspace  &ws) override {
+  void RunImpl(Workspace &ws) override {
     TYPE_SWITCH(dtype_, type2id, T, TRANSFORM_INPUT_TYPES, (
       RunImplTyped<T>(ws, SupportedDims());
     ), DALI_FAIL(make_string("Unsupported data type: ", dtype_)));  // NOLINT
   }
 
-  void PostprocessOutputs(Workspace  &ws) override {
+  void PostprocessOutputs(Workspace &ws) override {
     if (this->IsExpanding()) {
       auto &out = ws.Output<CPUBackend>(0);
       int sample_dim = out.sample_dim();

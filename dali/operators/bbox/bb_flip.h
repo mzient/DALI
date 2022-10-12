@@ -79,7 +79,7 @@ class BbFlipCPU : public BbFlip<CPUBackend> {
   explicit BbFlipCPU(const OpSpec &spec) : BbFlip<CPUBackend>(spec) {}
 
  protected:
-  void RunImpl(Workspace  &ws) override;
+  void RunImpl(Workspace &ws) override;
   using BbFlip<CPUBackend>::RunImpl;
 
  private:

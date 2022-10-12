@@ -187,7 +187,7 @@ for the necessary for alignment, you can specify a value of 1.)code",
 
 template <>
 bool Pad<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                const Workspace  &ws) {
+                                const Workspace &ws) {
   output_desc.resize(1);
   const auto &input = ws.Input<CPUBackend>(0);
   auto in_shape = input.shape();
@@ -221,7 +221,7 @@ bool Pad<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void Pad<CPUBackend>::RunImpl(Workspace  &ws) {
+void Pad<CPUBackend>::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   output.SetLayout(input.GetLayout());

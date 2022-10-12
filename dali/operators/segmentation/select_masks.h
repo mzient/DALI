@@ -39,12 +39,12 @@ class SelectMasksCPU : public Operator<CPUBackend> {
     return true;
   }
 
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
  private:
   template <typename T>
-  void RunImplTyped(Workspace  &ws);
+  void RunImplTyped(Workspace &ws);
 
   struct PolygonDesc {
     int new_mask_id = -1;

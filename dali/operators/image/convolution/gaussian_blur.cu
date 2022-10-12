@@ -73,7 +73,7 @@ extern template op_impl_uptr GetGaussianBlurGpuImpl<float, double>(const OpSpec*
 // Passing to the kernel less samples (not split into frames) speeds-up
 // the processing, so expand frames dim only if some argument was specified per-frame
 template <>
-bool GaussianBlur<GPUBackend>::ShouldExpand(const Workspace  &ws) {
+bool GaussianBlur<GPUBackend>::ShouldExpand(const Workspace &ws) {
   const auto& input = ws.Input<GPUBackend>(0);
   auto layout = input.GetLayout();
   dim_desc_ = convolution_utils::ParseAndValidateDim(input.shape().sample_dim(), layout);
@@ -88,7 +88,7 @@ bool GaussianBlur<GPUBackend>::ShouldExpand(const Workspace  &ws) {
 
 template <>
 bool GaussianBlur<GPUBackend>::SetupImpl(std::vector<OutputDesc>& output_desc,
-                                         const Workspace  &ws) {
+                                         const Workspace &ws) {
   const auto& input = ws.Input<GPUBackend>(0);
   assert(input.GetLayout().empty() || input.GetLayout().size() == dim_desc_.total_axes_count);
   auto dtype = dtype_ == DALI_NO_TYPE ? input.type() : dtype_;
@@ -114,7 +114,7 @@ bool GaussianBlur<GPUBackend>::SetupImpl(std::vector<OutputDesc>& output_desc,
 }
 
 template <>
-void GaussianBlur<GPUBackend>::RunImpl(Workspace  &ws) {
+void GaussianBlur<GPUBackend>::RunImpl(Workspace &ws) {
   impl_->RunImpl(ws);
 }
 

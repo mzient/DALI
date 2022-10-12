@@ -46,7 +46,7 @@ width of black squares plus the spacing between them.)code",
                     0.0f, true);
 
 bool GridMaskCpu::SetupImpl(std::vector<OutputDesc> &output_desc,
-                            const Workspace  &ws) {
+                            const Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   const auto &output = ws.Output<CPUBackend>(0);
   output_desc.resize(1);
@@ -63,7 +63,7 @@ bool GridMaskCpu::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 
-void GridMaskCpu::RunImpl(Workspace  &ws) {
+void GridMaskCpu::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   output.SetLayout(input.GetLayout());

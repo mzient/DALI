@@ -186,7 +186,7 @@ NumbaFuncImpl<CPUBackend>::NumbaFuncImpl(const OpSpec &spec) : Base(spec) {
 
 template <>
 bool NumbaFuncImpl<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-    const Workspace  &ws) {
+    const Workspace &ws) {
   int ninputs = ws.NumInput();
   int noutputs = out_types_.size();
   DALI_ENFORCE(in_types_.size() == static_cast<size_t>(ninputs), make_string(
@@ -258,7 +258,7 @@ bool NumbaFuncImpl<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void NumbaFuncImpl<CPUBackend>::RunImpl(Workspace  &ws) {
+void NumbaFuncImpl<CPUBackend>::RunImpl(Workspace &ws) {
   auto N = ws.Input<CPUBackend>(0).shape().num_samples();
 
   std::vector<uint64_t> out_ptrs;

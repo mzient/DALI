@@ -54,8 +54,8 @@ class GridMaskCpu : public GridMask<CPUBackend> {
   using Operator<CPUBackend>::RunImpl;
 
  protected:
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 };
 
 class GridMaskGpu : public GridMask<GPUBackend> {

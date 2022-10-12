@@ -169,8 +169,8 @@ class EraseImplCpu : public OpImplBase<CPUBackend> {
    */
   explicit EraseImplCpu(const OpSpec *spec) : spec_(*spec), fill_value_("fill_value", *spec) {}
 
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
  private:
   const OpSpec &spec_;
@@ -182,7 +182,7 @@ class EraseImplCpu : public OpImplBase<CPUBackend> {
 
 template <typename T, int Dims>
 bool EraseImplCpu<T, Dims>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                      const Workspace  &ws) {
+                                      const Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto layout = input.GetLayout();
   auto type = input.type();
@@ -222,7 +222,7 @@ void EraseImplCpu<T, Dims>::RunImpl(Workspace &ws) {
 
 template <>
 bool Erase<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                  const Workspace  &ws) {
+                                  const Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto in_shape = input.shape();
   TYPE_SWITCH(input.type(), type2id, T, ERASE_SUPPORTED_TYPES, (
@@ -236,7 +236,7 @@ bool Erase<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <>
-void Erase<CPUBackend>::RunImpl(Workspace  &ws) {
+void Erase<CPUBackend>::RunImpl(Workspace &ws) {
   assert(impl_ != nullptr);
   impl_->RunImpl(ws);
 }

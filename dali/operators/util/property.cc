@@ -19,7 +19,7 @@ namespace dali {
 namespace tensor_property {
 
 template <>
-void SourceInfo<CPUBackend>::FillOutput(Workspace  &ws) {
+void SourceInfo<CPUBackend>::FillOutput(Workspace &ws) {
   const auto& input = ws.Input<CPUBackend>(0);
   auto& output = ws.Output<CPUBackend>(0);
   for (int sample_id = 0; sample_id < input.num_samples(); sample_id++) {
@@ -29,7 +29,7 @@ void SourceInfo<CPUBackend>::FillOutput(Workspace  &ws) {
 }
 
 template <>
-void Layout<CPUBackend>::FillOutput(Workspace  &ws) {
+void Layout<CPUBackend>::FillOutput(Workspace &ws) {
   const auto& input = ws.Input<CPUBackend>(0);
   auto& output = ws.Output<CPUBackend>(0);
   for (int sample_id = 0; sample_id < input.num_samples(); sample_id++) {
@@ -39,7 +39,7 @@ void Layout<CPUBackend>::FillOutput(Workspace  &ws) {
 }
 
 template <>
-void SourceInfo<GPUBackend>::FillOutput(Workspace  &ws) {
+void SourceInfo<GPUBackend>::FillOutput(Workspace &ws) {
   const auto& input = ws.Input<GPUBackend>(0);
   auto& output = ws.Output<GPUBackend>(0);
   for (int sample_id = 0; sample_id < input.num_samples(); sample_id++) {
@@ -50,7 +50,7 @@ void SourceInfo<GPUBackend>::FillOutput(Workspace  &ws) {
 }
 
 template <>
-void Layout<GPUBackend>::FillOutput(Workspace  &ws) {
+void Layout<GPUBackend>::FillOutput(Workspace &ws) {
   const auto& input = ws.Input<GPUBackend>(0);
   auto& output = ws.Output<GPUBackend>(0);
   for (int sample_id = 0; sample_id < input.num_samples(); sample_id++) {

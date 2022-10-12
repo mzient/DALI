@@ -51,7 +51,7 @@ class LaplacianOpGpu : public OpImplBase<GPUBackend> {
     kmgr_.Resize<Kernel>(1);
   }
 
-  bool SetupImpl(std::vector<OutputDesc>& output_desc, const Workspace  &ws) override {
+  bool SetupImpl(std::vector<OutputDesc>& output_desc, const Workspace &ws) override {
     ctx_.gpu.stream = ws.stream();
 
     const auto& input = ws.Input<GPUBackend>(0);
@@ -111,7 +111,7 @@ class LaplacianOpGpu : public OpImplBase<GPUBackend> {
     return true;
   }
 
-  void RunImpl(Workspace  &ws) override {
+  void RunImpl(Workspace &ws) override {
     const auto& input = ws.Input<GPUBackend>(0);
     auto& output = ws.Output<GPUBackend>(0);
     output.SetLayout(input.GetLayout());

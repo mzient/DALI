@@ -57,12 +57,12 @@ class RandomMaskPixelCPU : public Operator<CPUBackend> {
  public:
   explicit RandomMaskPixelCPU(const OpSpec &spec);
   bool CanInferOutputs() const override { return true; }
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
  private:
   template <typename T>
-  void RunImplTyped(Workspace  &ws);
+  void RunImplTyped(Workspace &ws);
 
   BatchRNG<std::mt19937> rngs_;
   std::vector<SearchableRLEMask> rle_;
@@ -87,7 +87,7 @@ RandomMaskPixelCPU::RandomMaskPixelCPU(const OpSpec &spec)
 }
 
 bool RandomMaskPixelCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                    const Workspace  &ws) {
+                                    const Workspace &ws) {
   const auto &in_masks = ws.Input<CPUBackend>(0);
   int nsamples = in_masks.num_samples();
   auto in_masks_shape = in_masks.shape();
@@ -110,7 +110,7 @@ bool RandomMaskPixelCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
 }
 
 template <typename T>
-void RandomMaskPixelCPU::RunImplTyped(Workspace  &ws) {
+void RandomMaskPixelCPU::RunImplTyped(Workspace &ws) {
   const auto &in_masks = ws.Input<CPUBackend>(0);
   auto &out_pixel_pos = ws.Output<CPUBackend>(0);
   int nsamples = in_masks.num_samples();
@@ -170,7 +170,7 @@ void RandomMaskPixelCPU::RunImplTyped(Workspace  &ws) {
   thread_pool.RunAll();
 }
 
-void RandomMaskPixelCPU::RunImpl(Workspace  &ws) {
+void RandomMaskPixelCPU::RunImpl(Workspace &ws) {
   const auto &in_masks = ws.Input<CPUBackend>(0);
   TYPE_SWITCH(in_masks.type(), type2id, T, MASK_SUPPORTED_TYPES, (
     RunImplTyped<T>(ws);

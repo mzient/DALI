@@ -46,10 +46,10 @@ void OperatorBase::EnforceUniformOutputBatchSize(const Workspace &ws) const {
 
 template <>
 void OperatorBase::EnforceUniformOutputBatchSize<MixedBackend>(
-    const Workspace  &ws) const {
+    const Workspace &ws) const {
   auto ref_batch_size = ws.NumInput() > 0 ? ws.GetInputBatchSize(0) : ws.GetRequestedBatchSize(0);
   for (int i = 0; i < ws.NumOutput(); i++) {
-    auto output_batch_size = const_cast<Workspace  &>(ws)
+    auto output_batch_size = const_cast<Workspace &>(ws)
                                  .Output<GPUBackend>(i)
                                  .shape()
                                  .num_samples();
@@ -60,10 +60,10 @@ void OperatorBase::EnforceUniformOutputBatchSize<MixedBackend>(
 }
 
 
-template void OperatorBase::EnforceUniformInputBatchSize<CPUBackend>(const Workspace  &w) const;  // NOLINT
+template void OperatorBase::EnforceUniformInputBatchSize<CPUBackend>(const Workspace &w) const;  // NOLINT
 template void OperatorBase::EnforceUniformInputBatchSize<GPUBackend>(const Workspace &w) const;  // NOLINT
-template void OperatorBase::EnforceUniformInputBatchSize<MixedBackend>(const Workspace  &w) const;  // NOLINT
-template void OperatorBase::EnforceUniformOutputBatchSize<CPUBackend>(const Workspace  &w) const;  // NOLINT
+template void OperatorBase::EnforceUniformInputBatchSize<MixedBackend>(const Workspace &w) const;  // NOLINT
+template void OperatorBase::EnforceUniformOutputBatchSize<CPUBackend>(const Workspace &w) const;  // NOLINT
 template void OperatorBase::EnforceUniformOutputBatchSize<GPUBackend>(const Workspace &w) const;  // NOLINT
 
 

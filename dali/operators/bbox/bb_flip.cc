@@ -39,7 +39,7 @@ system, that is 0.0-1.0)code")
                     R"code(Flip vertical dimension.)code",
                     0, true);
 
-void BbFlipCPU::RunImpl(Workspace  &ws) {
+void BbFlipCPU::RunImpl(Workspace &ws) {
   const auto &input = ws.Input<CPUBackend>(0);
   auto &output = ws.Output<CPUBackend>(0);
   auto in_view = view<const float>(input);

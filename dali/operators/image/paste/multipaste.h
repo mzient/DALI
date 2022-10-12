@@ -310,10 +310,10 @@ class MultiPasteCPU : public MultiPasteOp<CPUBackend, MultiPasteCPU> {
 
  private:
   template<typename OutputType, typename InputType>
-  void RunTyped(Workspace  &ws);
+  void RunTyped(Workspace &ws);
 
   template<typename OutputType, typename InputType>
-  void SetupTyped(const Workspace  &ws,
+  void SetupTyped(const Workspace &ws,
                   const TensorListShape<> &out_shape);
 
   friend class MultiPasteOp<CPUBackend, MultiPasteCPU>;

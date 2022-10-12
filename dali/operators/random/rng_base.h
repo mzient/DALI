@@ -97,10 +97,15 @@ class RNGBase : public Operator<Backend> {
   }
 
   template <typename T, typename Dist>
-  void RunImplTyped(Workspace  &ws);
+  void RunImplTyped(Workspace &ws, CPUBackend);
 
   template <typename T, typename Dist>
-  void RunImplTyped(Workspace &ws);
+  void RunImplTyped(Workspace &ws, GPUBackend);
+
+  template <typename T, typename Dist>
+  void RunImplTyped(Workspace &ws) {
+    RunImplTyped<T, Dist>(ws, Backend{});
+  }
 
   using Operator<Backend>::spec_;
   using Operator<Backend>::max_batch_size_;

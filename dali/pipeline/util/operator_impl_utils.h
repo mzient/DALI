@@ -24,7 +24,6 @@
 #include "dali/pipeline/operator/op_spec.h"
 #include "dali/pipeline/workspace/workspace.h"
 #include "dali/pipeline/workspace/sample_workspace.h"
-#include "dali/pipeline/workspace/workspace.h"
 
 namespace dali {
 
@@ -45,7 +44,7 @@ class OpImplBase<CPUBackend> {
  public:
   virtual ~OpImplBase() = default;
   virtual bool SetupImpl(std::vector<OutputDesc> &output_desc,
-                         const Workspace  &ws) = 0;
+                         const Workspace &ws) = 0;
   virtual void RunImpl(Workspace &ws) {
     assert(false);
   }

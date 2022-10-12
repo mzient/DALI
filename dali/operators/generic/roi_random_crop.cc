@@ -71,8 +71,8 @@ class ROIRandomCropCPU : public Operator<CPUBackend> {
  public:
   explicit ROIRandomCropCPU(const OpSpec &spec);
   bool CanInferOutputs() const override { return true; }
-  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace  &ws) override;
-  void RunImpl(Workspace  &ws) override;
+  bool SetupImpl(std::vector<OutputDesc> &output_desc, const Workspace &ws) override;
+  void RunImpl(Workspace &ws) override;
 
  private:
   BatchRNG<std::mt19937> rngs_;
@@ -101,7 +101,7 @@ ROIRandomCropCPU::ROIRandomCropCPU(const OpSpec &spec)
 }
 
 bool ROIRandomCropCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
-                                 const Workspace  &ws) {
+                                 const Workspace &ws) {
   int nsamples = spec_.HasTensorArgument("crop_shape") ?
                      ws.ArgumentInput("crop_shape").num_samples() :
                      ws.GetRequestedBatchSize(0);
@@ -174,7 +174,7 @@ bool ROIRandomCropCPU::SetupImpl(std::vector<OutputDesc> &output_desc,
   return true;
 }
 
-void ROIRandomCropCPU::RunImpl(Workspace  &ws) {
+void ROIRandomCropCPU::RunImpl(Workspace &ws) {
   auto &out_crop_start = ws.Output<CPUBackend>(0);
   auto crop_start = view<int64_t, 1>(out_crop_start);
 

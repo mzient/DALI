@@ -80,7 +80,7 @@ class NonsilenceOperatorCpu : public NonsilenceOperator<CPUBackend> {
   DISABLE_COPY_MOVE_ASSIGN(NonsilenceOperatorCpu);
 
  protected:
-  void RunImpl(Workspace  &ws) override {
+  void RunImpl(Workspace &ws) override {
     const auto &input = ws.Input<CPUBackend>(0);
 
     TYPE_SWITCH(input.type(), type2id, InputType, (NONSILENCE_TYPES),
@@ -92,7 +92,7 @@ class NonsilenceOperatorCpu : public NonsilenceOperator<CPUBackend> {
 
  private:
   template<typename InputType>
-  void RunImplTyped(Workspace  &ws) {
+  void RunImplTyped(Workspace &ws) {
     const auto &input = ws.Input<CPUBackend>(0);
     auto &output_begin = ws.Output<CPUBackend>(0);
     auto &output_length = ws.Output<CPUBackend>(1);

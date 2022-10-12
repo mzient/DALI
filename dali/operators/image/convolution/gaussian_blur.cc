@@ -87,7 +87,7 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
    */
   explicit GaussianBlurOpCpu(const OpSpec* spec) : spec_(*spec) {}
 
-  bool SetupImpl(std::vector<OutputDesc>& output_desc, const Workspace  &ws) override {
+  bool SetupImpl(std::vector<OutputDesc>& output_desc, const Workspace &ws) override {
     const auto& input = ws.Input<CPUBackend>(0);
     int nsamples = input.num_samples();
 
@@ -108,7 +108,7 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
     return true;
   }
 
-  void RunImpl(Workspace  &ws) override {
+  void RunImpl(Workspace &ws) override {
     const auto& input = ws.Input<CPUBackend>(0);
     auto& output = ws.Output<CPUBackend>(0);
     output.SetLayout(input.GetLayout());
@@ -149,7 +149,7 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
 }  // namespace gaussian_blur
 
 template <>
-bool GaussianBlur<CPUBackend>::ShouldExpand(const Workspace  &ws) {
+bool GaussianBlur<CPUBackend>::ShouldExpand(const Workspace &ws) {
   const auto& input = ws.Input<CPUBackend>(0);
   auto layout = input.GetLayout();
   dim_desc_ = convolution_utils::ParseAndValidateDim(input.shape().sample_dim(), layout);
@@ -164,7 +164,7 @@ bool GaussianBlur<CPUBackend>::ShouldExpand(const Workspace  &ws) {
 
 template <>
 bool GaussianBlur<CPUBackend>::SetupImpl(std::vector<OutputDesc>& output_desc,
-                                         const Workspace  &ws) {
+                                         const Workspace &ws) {
   const auto& input = ws.Input<CPUBackend>(0);
   assert(input.GetLayout().empty() || input.GetLayout().size() == dim_desc_.total_axes_count);
   auto dtype = dtype_ == DALI_NO_TYPE ? input.type() : dtype_;
@@ -194,7 +194,7 @@ bool GaussianBlur<CPUBackend>::SetupImpl(std::vector<OutputDesc>& output_desc,
 }
 
 template <>
-void GaussianBlur<CPUBackend>::RunImpl(Workspace  &ws) {
+void GaussianBlur<CPUBackend>::RunImpl(Workspace &ws) {
   impl_->RunImpl(ws);
 }
 

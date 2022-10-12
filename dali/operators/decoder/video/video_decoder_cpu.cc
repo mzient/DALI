@@ -38,7 +38,7 @@ bool VideoDecoderCpu::SetupImpl(std::vector<OutputDesc> &output_desc,
   return true;
 }
 
-void VideoDecoderCpu::RunImpl(Workspace  &ws) {
+void VideoDecoderCpu::RunImpl(Workspace &ws) {
   auto &output = ws.Output<CPUBackend>(0);
   const auto &input = ws.Input<CPUBackend>(0);
   int batch_size = input.num_samples();
