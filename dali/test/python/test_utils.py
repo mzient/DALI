@@ -24,38 +24,40 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import namedtuple
 
 
 def get_arch(device_id=0):
     compute_cap = 0
     try:
-        import pynvml
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
-        compute_cap = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
-        compute_cap = compute_cap[0] + compute_cap[1] / 10.
+        from cuda import cudart
+        err, prop = cudart.cudaGetDeviceProperties(device_id)
+        compute_cap = prop.major + prop.minor / 10
     except ModuleNotFoundError:
-        print("NVML not found")
+        print("CUDA Python bindings not found")
     return compute_cap
 
 
 def is_mulit_gpu():
     try:
-        import pynvml
-        pynvml.nvmlInit()
-        is_mulit_gpu_var = pynvml.nvmlDeviceGetCount() != 1
+        from cuda import cudart
+        err, count = cudart.cudaGetDeviceCount()
     except ModuleNotFoundError:
-        print("Python bindings for NVML not found")
+        print("CUDA Python bindings not found")
 
-    return is_mulit_gpu_var
+    return count > 1
 
 
 def get_device_memory_info(device_id=0):
     try:
-        import pynvml
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(device_id)
-        return pynvml.nvmlDeviceGetMemoryInfo(handle)
+        from cuda import cudart
+        error, dev = cudart.cudaGetDevice()
+        if dev != device_id:
+            cudart.cudaSetDevice(device_id)
+        error, free, total = cudart.cudaMemGetInfo()
+        if dev != device_id:
+            cudart.cudaSetDevice(dev)
+        return namedtuple("MemInfo", "free total")(free, total)
     except ModuleNotFoundError:
         print("Python bindings for NVML not found")
         return None
