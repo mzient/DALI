@@ -501,7 +501,8 @@ std::string GetOpColor(OpType op_type) {
 void OpGraph::GenerateDOTFromGraph(std::ofstream &ofs, bool show_tensors, bool show_ids,
                                    bool use_colors) {
   // Just output all the edges
-  for (auto &op : op_nodes_) {
+  this->tensor_nodes_[0].consumers
+  /*for (auto &op : op_nodes_) {
     if (use_colors) {
       PrintTo(ofs, op, show_ids) << "[color=\"" << GetOpColor(op.op_type) << "\"];\n";
     }
@@ -525,7 +526,7 @@ void OpGraph::GenerateDOTFromGraph(std::ofstream &ofs, bool show_tensors, bool s
       }
     }
     ofs << "\n";
-  }
+  }*/
 }
 
 void OpGraph::GenerateDOTFromGraph(const TensorNode &current_node, std::ofstream &ofs,
