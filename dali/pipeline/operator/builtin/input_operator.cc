@@ -1,4 +1,4 @@
-// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022, 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ void InputOperator<GPUBackend>::ForwardCurrentData(TensorList<GPUBackend> &targe
                                                    std::optional<std::string> &target_data_id,
                                                    cudaStream_t stream) {
   std::list<uptr_tl_type> tensor_list_elm;
-  std::list<uptr_cuda_event_type> internal_copy_to_storage;
+  std::list<CUDAEvent> internal_copy_to_storage;
   InputSourceState state_info;
   {
     std::unique_lock<std::mutex> busy_lock(busy_m_);
@@ -105,7 +105,7 @@ void InputOperator<GPUBackend>::ForwardCurrentData(TensorList<GPUBackend> &targe
   }
 
   if (!state_info.no_copy || state_info.copied_shared_data) {
-    CUDA_CALL(cudaStreamWaitEvent(stream, *internal_copy_to_storage.front(), 0));
+    CUDA_CALL(cudaStreamWaitEvent(stream, internal_copy_to_storage.front(), 0));
   }
   target_data_id = std::move(tensor_list_elm.front().data_id);
   tensor_list_elm.front().data_id = std::nullopt;

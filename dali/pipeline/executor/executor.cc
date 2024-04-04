@@ -626,19 +626,16 @@ int Executor<WorkspacePolicy, QueuePolicy>::InferBatchSize(
   if (bsps.empty()) {
     return max_batch_size_;
   }
-  for (size_t i = 1; i < bsps.size(); i++) {
-    DALI_ENFORCE(bsps[0]->NextBatchSize() == bsps[i]->NextBatchSize(),
-                 "Batch size must be uniform across an iteration");
-  }
   int batch_size;
   try {
     batch_size = bsps[0]->NextBatchSize();
-    for (auto &bsp : bsps) {
-      bsp->Advance();
+    for (size_t i = 1; i < bsps.size(); i++) {
+      DALI_ENFORCE(batch_size == bsps[i]->NextBatchSize(),
+                  "Batch size must be uniform across an iteration");
     }
   } catch (const std::out_of_range &e) {
     DALI_FAIL(
-        make_string("Failed to acquire the next batch. Make sure, that DALI Pipeline is fed "
+        make_string("Failed to acquire the next batch. Make sure that DALI Pipeline is fed "
                     "with sufficient amount of data. ", e.what()));
   }
   return batch_size;

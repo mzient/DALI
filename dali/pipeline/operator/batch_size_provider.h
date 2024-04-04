@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,23 +33,14 @@ class BatchSizeProvider {
    */
  public:
   /**
-   * Returns next batch size.
+   * @brief Returns the size of the upcoming batch.
    *
-   * Implementation shall assure that it's possible to call NextBatchSize()
-   * multiple times for the same batch, before Advance() invocation.
+   * The function returns the size of the next batch that the operator will produce.
    *
    * When there's no next batch size available, the implementation shall throw std::out_of_range
    * or wait for more data in the blocking mode.
    */
-  virtual int NextBatchSize() = 0;
-
-  /**
-   * Advances to next batch.
-   *
-   * When there's no further data available, Advance() shall throw std::out_of_range
-   * or wait for more data in the blocking mode.
-   */
-  virtual void Advance() = 0;
+  virtual int NextBatchSize() const = 0;
 };
 
 }  // namespace dali

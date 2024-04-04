@@ -1,4 +1,4 @@
-// Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,11 +33,6 @@ namespace dali {
 
 namespace detail {
 
-struct CudaEventWrapper : CUDAEvent {
-  CudaEventWrapper() : CUDAEvent(CUDAEvent::Create()) {}
-};
-
-
 /**
  * Custom structure to hold the input data inside the CachingList.
  * Apart from holding a pointer to the data, it can also contain other data associated with the
@@ -50,29 +45,15 @@ struct named_pointer_to_tensor_list_t {
   std::unique_ptr<element_type> data = nullptr;
   std::optional<std::string> data_id = std::nullopt;
 
+  named_pointer_to_tensor_list_t() {
+    data = std::make_unique<element_type>();
+  }
 
   named_pointer_to_tensor_list_t(std::unique_ptr<element_type> data) :  // NOLINT
           data(std::move(data)) {}
 
-  ~named_pointer_to_tensor_list_t() = default;
-
-  named_pointer_to_tensor_list_t(const named_pointer_to_tensor_list_t &) = delete;
-
-  named_pointer_to_tensor_list_t &operator=(const named_pointer_to_tensor_list_t &) = delete;
-
-
-  named_pointer_to_tensor_list_t &operator=(named_pointer_to_tensor_list_t &&other) noexcept {
-    data = std::move(other.data);
-    data_id = std::move(other.data_id);
-    other.data = nullptr;
-    other.data_id = std::nullopt;
-  }
-
-
-  named_pointer_to_tensor_list_t(named_pointer_to_tensor_list_t &&other) noexcept {
-    *this = std::move(other);
-  }
-
+  named_pointer_to_tensor_list_t(named_pointer_to_tensor_list_t &&other) = default;
+  named_pointer_to_tensor_list_t &operator=(named_pointer_to_tensor_list_t &&other) = default;
 
   auto &operator*() const noexcept {
     return *data;
@@ -171,7 +152,6 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
           CPUBackend /* CPUBackend */,
           GPUBackend /* GPUBackend and MixedBackend */>;
   using uptr_tl_type = detail::named_pointer_to_tensor_list_t<InBackend>;
-  using uptr_cuda_event_type = std::unique_ptr<detail::CudaEventWrapper>;
 
  public:
   explicit InputOperator(const OpSpec &spec) :
@@ -323,31 +303,28 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
   /**
    * Peeks the data that is next in line.
    */
-  const TensorList<InBackend> &PeekCurrentData() {
+  const TensorList<InBackend> &PeekCurrentData() const {
     return *tl_data_.PeekFront();
   }
 
 
-  int NextBatchSize() override {
+  int NextBatchSize() const override {
     std::unique_lock<std::mutex> busy_lock(busy_m_);
     if (blocking_) {
       cv_.wait(busy_lock, [&data = tl_data_, &running = running_] {
-                             return !running || data.CanProphetAdvance();
+                             return !running || !data.IsEmpty();
                            });
     }
-    return tl_data_.PeekProphet()->num_samples();
-  }
-
-
-  void Advance() override {
-    std::unique_lock<std::mutex> busy_lock(busy_m_);
-    if (blocking_) {
-      cv_.wait(busy_lock, [&data = tl_data_, &running = running_] {
-                             return !running || data.CanProphetAdvance();
-                           });
+    // should we throw when !running?
+    try {
+      return tl_data_.PeekFront()->num_samples();
+    } catch (const std::out_of_range &) {
+      // rethrow with a less-generic message
+      throw std::out_of_range("Attempted to peek the data batch that doesn't exist. "
+                              "Add more elements to the DALI  input operator.");
     }
-    tl_data_.AdvanceProphet();
   }
+
 
   /**
    * "depleted" operator trace specifies whether the operator has sufficient resources to
@@ -374,8 +351,8 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
   // reference it is not that easy
   template<typename DataType>
   void RecycleBuffer(DataType &data,
-                     std::list<uptr_cuda_event_type> *cuda_event = nullptr,
-                     std::list<uptr_cuda_event_type> *copy_to_gpu = nullptr) {
+                     std::list<CUDAEvent> *cuda_event = nullptr,
+                     std::list<CUDAEvent> *copy_to_gpu = nullptr) {
     // No need to synchronize on copy_to_gpu - it was already synchronized before
     std::lock_guard<std::mutex> busy_lock(busy_m_);
     tl_data_.Recycle(data);
@@ -447,9 +424,10 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
     } else {
       // it is not contiguous so we need to copy
       tl_elm.front()->Copy(batch, order, use_copy_kernel);
-      std::list<uptr_cuda_event_type> copy_to_storage_event;
-      copy_to_storage_event = copy_to_storage_events_.GetEmpty();
-      CUDA_CALL(cudaEventRecord(*copy_to_storage_event.front(), order.stream()));
+      std::list<CUDAEvent> copy_to_storage_event;
+      copy_to_storage_event = copy_to_storage_events_.GetEmpty(
+        []() { return CUDAEvent::Create(); });
+      CUDA_CALL(cudaEventRecord(copy_to_storage_event.front(), order.stream()));
       copy_to_storage_events_.PushBack(copy_to_storage_event);
 
       if (zero_copy_noncontiguous_gpu_input_) {
@@ -496,12 +474,13 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
   std::enable_if_t<std::is_same<B, GPUBackend>::value>
   CopyUserData(const TensorList<SrcBackend> &batch, std::optional<std::string> data_id,
                AccessOrder order, bool sync, bool use_copy_kernel) {
-    std::list<uptr_cuda_event_type> copy_to_storage_event;
+    std::list<CUDAEvent> copy_to_storage_event;
     std::list<uptr_tl_type> tl_elm;
     {
       std::lock_guard<std::mutex> busy_lock(busy_m_);
       tl_elm = GetEmptyOutputBatch(std::move(data_id));
-      copy_to_storage_event = copy_to_storage_events_.GetEmpty();
+      copy_to_storage_event = copy_to_storage_events_.GetEmpty(
+        []() { return CUDAEvent::Create(); });
     }
     // If we got a host order we most probably got it via FeedPipeline and we are trying to pass the
     // data from CPU to GPU. As we keep the order in tl_data_ as internal_copy_stream_, we will use
@@ -512,9 +491,9 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
       order = tl_elm.front()->order();
     }
     tl_elm.front()->Copy(batch, order, use_copy_kernel);
-    CUDA_CALL(cudaEventRecord(*copy_to_storage_event.front(), order.stream()));
+    CUDA_CALL(cudaEventRecord(copy_to_storage_event.front(), order.stream()));
     if (sync) {
-      CUDA_CALL(cudaEventSynchronize(*copy_to_storage_event.front()));
+      CUDA_CALL(cudaEventSynchronize(copy_to_storage_event.front()));
     }
 
     {
@@ -573,10 +552,10 @@ class InputOperator : public Operator<Backend>, virtual public BatchSizeProvider
 
 
   CachingList<uptr_tl_type> tl_data_;
-  CachingList<uptr_cuda_event_type> copy_to_storage_events_;
+  CachingList<CUDAEvent> copy_to_storage_events_;
 
-  std::mutex busy_m_;
-  std::condition_variable cv_;
+  mutable std::mutex busy_m_;
+  mutable std::condition_variable cv_;
 
   std::list<InputSourceState> state_;
 
