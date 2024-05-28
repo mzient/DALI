@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include <thread>
+#include <fstream>
 #include "dali/core/mm/default_resources.h"
 #include "dali/core/mm/detail/align.h"
 #include "dali/core/mm/malloc_resource.h"
@@ -26,6 +27,9 @@
 
 #include "dali/core/mm/cuda_vm_resource.h"
 #include "dali/core/mm/with_upstream.h"
+
+#include <chrono>
+#include <random>
 
 namespace dali {
 namespace mm {
@@ -525,6 +529,105 @@ TEST(MMDefaultResource, PreallocateDeviceMemory_MultiGPU) {
     GTEST_SKIP() << "At least 2 devices needed for the test\n";
   }
 }
+
+using perfclock = std::chrono::high_resolution_clock;
+
+template <typename Out = double, typename R, typename P>
+inline Out microseconds(std::chrono::duration<R, P> d) {
+  return std::chrono::duration_cast<std::chrono::duration<Out, std::micro>>(d).count();
+}
+
+TEST(MMDefaultResource, RandomAllocations) {
+  /*cudaMemPool_t mempool;
+  cudaDeviceGetDefaultMemPool(&mempool, 0);
+  uint64_t threshold = UINT64_MAX;
+  cudaMemPoolSetAttribute(mempool, cudaMemPoolAttrReleaseThreshold, &threshold);*/
+
+  CUDAStream stream = CUDAStream::Create(true);
+
+  auto &pool = *GetDefaultDeviceResource(0);
+  std::mt19937_64 rng(12345);
+  std::bernoulli_distribution is_free(0.5);
+  std::uniform_int_distribution<int> align_dist(0, 8);  // alignment anywhere from 1B to 256B
+  std::uniform_real_distribution<float> size_log_dist(4, 26);
+  struct allocation {
+    void *ptr;
+    size_t size, alignment;
+  };
+  std::vector<allocation> allocs;
+
+  int num_iter = 100000;
+
+  std::map<uintptr_t, size_t> allocated;
+  struct operation {
+    bool is_free;
+    void *ptr;
+    size_t size;
+  };
+  std::vector<operation> operations;
+
+  perfclock::duration alloc_time = {};
+  perfclock::duration dealloc_time = {};
+
+  int total_allocations = 0;
+  int total_deallocations = 0;
+
+  for (int i = 0; i < num_iter; i++) {
+    if (is_free(rng) && !allocs.empty()) {
+      auto idx = rng() % allocs.size();
+      allocation a = allocs[idx];
+      auto t0 = perfclock::now();
+      pool.deallocate_async(a.ptr, a.size, a.alignment, stream.get());
+      auto t1 = perfclock::now();
+      operations.push_back({true, a.ptr, a.size});
+      dealloc_time += t1 - t0;
+      std::swap(allocs[idx], allocs.back());
+      allocs.pop_back();
+      total_deallocations++;
+    } else {
+      allocation a;
+      float sz_log = size_log_dist(rng);
+      size_t size = std::lround(std::exp2(sz_log));
+      a.size = size;
+      a.alignment = 1 << align_dist(rng);
+      auto t0 = perfclock::now();
+      a.ptr = pool.allocate_async(a.size, a.alignment, stream.get());
+      auto t1 = perfclock::now();
+      operations.push_back({false, a.ptr, a.size});
+      alloc_time += t1 - t0;
+      ASSERT_TRUE(detail::is_aligned(a.ptr, a.alignment));
+      CUDA_CALL(cudaMemsetAsync(a.ptr, 0, a.size, stream));
+      CUDA_CALL(cudaStreamSynchronize(stream));  // wait now so the deallocation timing is not affected
+      allocs.push_back(a);
+      total_allocations++;
+    }
+  }
+
+  for (auto &a : allocs) {
+    auto t0 = perfclock::now();
+    pool.deallocate_async(a.ptr, a.size, a.alignment, stream.get());
+    auto t1 = perfclock::now();
+    operations.push_back({true, a.ptr, a.size});
+    dealloc_time += t1 - t0;
+    total_deallocations++;
+  }
+  allocs.clear();
+
+  CUDA_CALL(cudaDeviceSynchronize());
+
+  print(std::cerr,
+    "Average time to allocate:   ", microseconds(alloc_time) / total_allocations, " us\n"
+    "Average time to deallocate: ", microseconds(dealloc_time) / total_deallocations, " us\n"
+  );
+
+  std::ofstream ops("allocs.txt", std::ios::out|std::ios::trunc);
+  for (auto &op : operations) {
+    ops << (op.is_free ? "free" : "alloc") << "\t"
+        << op.size << "\t" << (void*)op.ptr << "\n";
+  }
+  ops.flush();
+}
+
 
 }  // namespace test
 }  // namespace mm
