@@ -45,6 +45,7 @@ OpTask::OpTaskOutputs OpTask::Run() {
   // from the inputs and we don't want them to be wrapped again as this operator's error.
   SetWorkspaceInputs();
   try {
+    SetWorkspaceInputs();
     SetupOp();
     RunOp();
     auto &&ret = GetWorkspaceOutputs();
