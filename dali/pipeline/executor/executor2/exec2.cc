@@ -145,7 +145,8 @@ class Executor2::Impl {
   void InitIteration() {
     WorkspaceParams params{};
     params.batch_size = config_.max_batch_size;
-    graph_.PrepareIteration(InitIterationData(iter_index_++), params);
+    params.iter_data = InitIterationData(iter_index_++);
+    graph_.PrepareIteration(params);
   }
 
   int InputFeedCount(std::string_view) {
