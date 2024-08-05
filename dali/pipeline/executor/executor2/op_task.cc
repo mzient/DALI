@@ -140,9 +140,11 @@ void OpTask::ApplyDefaultLayout(int input_idx, const OpSchema &schema) {
 
   TensorLayout layout_found = input.GetLayout();
 
+  // Validate the layout_found and possibly get the default
   auto layout = schema.GetInputLayout(input_idx, input.sample_dim(), layout_found);
   if (layout == layout_found)
     return;  // no need to adjust anything
+  assert(layout_found.empty() && "Layout found must match the final layout or be empty.");
 
   auto *input_edge = node_->inputs[input_idx];
   auto &source = input_edge->producer->outputs[input_edge->producer_output_idx];
@@ -190,9 +192,7 @@ void OpTask::ApplyDefaultLayouts() {
 void OpTask::SetupOp() {
   auto &ws = *ws_;
   int nout = node_->outputs.size();
-  std::vector<OutputDesc> output_descs;
   assert(ws.NumOutput() == nout);
-  output_descs.reserve(nout);
 
   skip_ = ShouldSkip();
 
@@ -227,8 +227,10 @@ void OpTask::SetupOp() {
   }
 
   if (!skip_) {
-    ApplyDefaultLayouts();
     DomainTimeRange tr("[DALI][OpTask] Setup " + GetOpDisplayName(node_->op->GetSpec()));
+    ApplyDefaultLayouts();
+    std::vector<OutputDesc> output_descs;
+    output_descs.reserve(nout);
     // If Setup returns true, we must resize the outputs;
     if (node_->op->Setup(output_descs, ws)) {
       assert(output_descs.size() == static_cast<size_t>(nout));
@@ -273,7 +275,12 @@ void OpTask::SetWorkspaceInputs() {
     } else {
       assert(ws_->InputIsType<GPUBackend>(i));
       auto inp = TaskInput<GPUBackend>(ti);
-      if (inp.event && inp.order != order)
+      // If the output order of the operator is `host` then we don't wait for GPU
+      // inputs - they can't be accessed directly on host and the operator will
+      // have to issue some sort of synchronization if and when necessary.
+      // This optimization is essential to avoid oversynchronization
+      // when the operator needs to access the metadata only (e.g. getting the shape).
+      if (order.is_device() /*see comment above */ && inp.event && inp.order != order)
         events.insert(inp.event);
       ws_->SetInput(i, inp.data);
     }
@@ -309,7 +316,7 @@ void OpTask::SetWorkspaceInputs() {
 
 AccessOrder OpTask::OutputConsumerOrder(int output_idx) {
   assert(static_cast<size_t>(output_idx) < node_->outputs.size());
-  // Return the common strueam.
+  // Return the common stream.
   auto &consumers = node_->outputs[output_idx].consumers;
   if (consumers.empty())
     return {};  // definitely no consumer
@@ -350,11 +357,10 @@ OpTask::OpTaskOutputs OpTask::GetWorkspaceOutputs() {
 
 void ExecNode::AddDataDeps() {
   for (auto &edge : inputs) {
-    assert(edge->producer->main_task);
-    main_task->Subscribe(edge->producer->main_task, edge->producer_output_idx);
+    assert(edge->producer->main_task_);
+    main_task_->Subscribe(edge->producer->main_task_, edge->producer_output_idx);
   }
 }
-
 
 }  // namespace exec2
 }  // namespace dali

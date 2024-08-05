@@ -70,6 +70,7 @@ void ExecGraph::Lower(const graph::OpGraph &def) {
     edge->device = data_node->device;
   }
 
+  Sort();
   Validate();
 }
 
