@@ -290,7 +290,7 @@ class StreamAssignment<StreamPolicy::PerOperator> {
                                   std::optional<int> prev_stream_id = std::nullopt) {
     // If the preceding node had a stream, then we have to pass it on through CPU nodes
     // if there are any GPU nodes down the graph.
-    // If the preciding node didn't have a stream, then we only need a stream if current
+    // If the preceding node didn't have a stream, then we only need a stream if current
     // node needs a stram.
     bool needs_stream = prev_stream_id.has_value()
                       ? gpu_contributors_.count(node) != 0
