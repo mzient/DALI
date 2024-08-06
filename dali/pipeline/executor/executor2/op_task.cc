@@ -30,7 +30,6 @@ namespace exec2 {
 
 void ClearWorkspacePayload(Workspace &ws) {
   auto event = ws.has_event() ? ws.event() : nullptr;
-  ws.InjectIterationData(nullptr);
   for (int i = 0; i < ws.NumInput(); i++) {
     // TODO(michalz): Some smarter deletion management
     // If an input has multiple consumers, we should guarantee that the buffer is not destroyed
@@ -42,17 +41,19 @@ void ClearWorkspacePayload(Workspace &ws) {
     // Perhaps a better approach would be to move the inputs to a dedicated deleteion stream.
     // on which we would record the completion events prior to decreasing the reference count.
     if (ws.InputIsType<CPUBackend>(i)) {
-      auto &inp = ws.Input<CPUBackend>(i);
-      if (event && inp.order() != ws.output_order())
-        inp.order().wait(event);
-
-      ws.SetInput<CPUBackend>(i, nullptr);
+      if (auto &pinp = ws.InputPtr<CPUBackend>(i)) {
+        auto &inp = *pinp;
+        if (event && inp.order() != ws.output_order())
+          inp.order().wait(event);
+        ws.SetInput<CPUBackend>(i, nullptr);
+      }
     } else if (ws.InputIsType<GPUBackend>(i)) {
-      auto &inp = ws.Input<GPUBackend>(i);
-      if (event && inp.order() != ws.output_order())
-        inp.order().wait(event);
-
-      ws.SetInput<GPUBackend>(i, nullptr);
+      if (auto &pinp = ws.InputPtr<GPUBackend>(i)) {
+          auto &inp = *pinp;
+        if (event && inp.order() != ws.output_order())
+          inp.order().wait(event);
+        ws.SetInput<GPUBackend>(i, nullptr);
+      }
     }
   }
 
@@ -65,13 +66,13 @@ void ClearWorkspacePayload(Workspace &ws) {
     else if (ws.OutputIsType<GPUBackend>(o))
       ws.SetOutput<GPUBackend>(o, nullptr);
   }
+
   ws.InjectIterationData(nullptr);
 }
 
 void OpTask::ClearWorkspace() {
   assert(ws_);
   ClearWorkspacePayload(*ws_);
-  ws_ = nullptr;
 }
 
 tasking::SharedTask OpTask::CreateTask(ExecNode *node, const WorkspaceParams &params) {
@@ -92,6 +93,8 @@ OpTask::OpTaskOutputs OpTask::Run() {
   auto workspace_scope = GetWorkspace();
   SetWorkspaceInputs();
   try {
+    if (auto prev_event = node_->PreviousIterationEvent())
+      CUDA_CALL(cudaEventSynchronize(prev_event));
     SetupOp();
     RunOp();
     auto &&ret = GetWorkspaceOutputs();
@@ -133,8 +136,7 @@ PipelineOutput OpTask::GetOutput() {
   for (int o = 0; o < ws_->NumOutput(); o++) {
     if (ws_->OutputIsType<CPUBackend>(o)) {
       auto &out = ws_->Output<CPUBackend>(o);
-      if (out.order().is_device())  // Only change the order of device-ordered CPU outputs
-        out.set_order(ws_->output_order(), false);
+      out.set_order(ws_->output_order(), false);
     } else {
       auto &out = ws_->Output<GPUBackend>(o);
       out.set_order(ws_->output_order(), false);
@@ -142,14 +144,15 @@ PipelineOutput OpTask::GetOutput() {
   }
 
   std::optional<int> device = {};
-  if (event_) {
-    int dev = -1;
+  if (ws_->output_order().is_device()) {
+    int dev;
     CUDA_CALL(cudaGetDevice(&dev));
     device = dev;
+    assert(ws_->event());
+    CUDA_CALL(cudaEventRecord(ws_->event(), ws_->output_order().stream()));
   }
 
   PipelineOutput ret{ *ws_, event_, device };
-  ClearWorkspacePayload(*ws_);
   return ret;
 }
 
@@ -241,27 +244,26 @@ void OpTask::SetupOp() {
 
   for (int i = 0; i < nout; i++) {
     if (ws.OutputIsType<CPUBackend>(i)) {
-      if (!ws.OutputPtr<CPUBackend>(i)) {
-        auto tl = std::make_shared<TensorList<CPUBackend>>();
-        bool pinned = node_->outputs[i].pinned;
-        tl->set_pinned(pinned);
-        if (pinned) {
+      assert(!ws.OutputPtr<CPUBackend>(i));
+      auto tl = std::make_shared<TensorList<CPUBackend>>();
+      bool pinned = node_->outputs[i].pinned;
+      tl->set_pinned(pinned);
+      if (pinned) {
+        if (ws.output_order().is_device())  // Only change the order of device-ordered CPU outputs
           tl->set_order(ws.output_order());
-          if (device < 0)
-            CUDA_CALL(cudaGetDevice(&device));
-          tl->set_device_id(device);
-        }
-        ws.SetOutput(i, tl);
-      }
-    } else if (ws.OutputIsType<GPUBackend>(i)) {
-      if (!ws.OutputPtr<GPUBackend>(i)) {
-        auto tl = std::make_shared<TensorList<GPUBackend>>();
-        tl->set_order(ws.output_order());
         if (device < 0)
           CUDA_CALL(cudaGetDevice(&device));
         tl->set_device_id(device);
-        ws.SetOutput(i, tl);
       }
+      ws.SetOutput(i, tl);
+    } else if (ws.OutputIsType<GPUBackend>(i)) {
+      assert(!ws.OutputPtr<GPUBackend>(i));
+      auto tl = std::make_shared<TensorList<GPUBackend>>();
+      tl->set_order(ws.output_order());
+      if (device < 0)
+        CUDA_CALL(cudaGetDevice(&device));
+      tl->set_device_id(device);
+      ws.SetOutput(i, tl);
     } else {
       assert(!"Unreachable code - unknown backend.");
     }
@@ -279,7 +281,9 @@ void OpTask::SetupOp() {
         if (ws.OutputIsType<CPUBackend>(i)) {
           ws.Output<CPUBackend>(i).Resize(output_descs[i].shape, output_descs[i].type);
         } else if (ws.OutputIsType<GPUBackend>(i)) {
-          ws.Output<GPUBackend>(i).Resize(output_descs[i].shape, output_descs[i].type);
+          auto &output = ws.Output<GPUBackend>(i);
+          output.Resize(output_descs[i].shape, output_descs[i].type);
+          CUDA_CALL(cudaMemsetAsync(output.raw_mutable_tensor(0), 128, output_descs[i].shape.num_elements() * TypeTable::GetTypeInfo(output_descs[i].type).size(), ws.stream()));
         } else {
           assert(!"Unreachable code - unknown backend.");
         }
@@ -298,12 +302,13 @@ void OpTask::RunOp() {
   if (auto cpt = ws_->GetIterationData()->checkpoint) {
     node_->op->SaveState(cpt->GetOpCheckpoint(node_->instance_name), ws_->output_order());
   }
-  if (ws_->has_event() && ws_->has_stream())
+  if (ws_->has_stream()) {
+    assert(ws_->has_event());
     CUDA_CALL(cudaEventRecord(ws_->event(), ws_->stream()));
+  }
 }
 
 void OpTask::SetWorkspaceInputs() {
-  std::tie(ws_, event_) = node_->GetWorkspace(ws_params_);
   int ti = 0;
   assert(ws_->NumInput() + ws_->NumArgumentInput() == static_cast<int>(node_->inputs.size()));
   auto order = ws_->output_order();
