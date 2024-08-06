@@ -93,8 +93,6 @@ OpTask::OpTaskOutputs OpTask::Run() {
   auto workspace_scope = GetWorkspace();
   SetWorkspaceInputs();
   try {
-    if (auto prev_event = node_->PreviousIterationEvent())
-      CUDA_CALL(cudaEventSynchronize(prev_event));
     SetupOp();
     RunOp();
     auto &&ret = GetWorkspaceOutputs();
