@@ -144,8 +144,12 @@ std::unique_ptr<Workspace> ExecNode::CreateOpWorkspace() {
 }
 
 /** Obtains a worskpace from a workspace cache or, if not found, creates a new one. */
+<<<<<<< HEAD
 std::pair<std::unique_ptr<Workspace>, SharedEventLease>
 ExecNode::GetWorkspace(WorkspaceParams params) {
+=======
+std::pair<std::unique_ptr<Workspace>, SharedEventLease> ExecNode::GetWorkspace(WorkspaceParams params) {
+>>>>>>> 10d7ebaef (Ensure there's just one workspace in use. Fix bugs.)
   if (!ws_) {
     assert(!has_workspace_);
     if (op) {
@@ -158,7 +162,11 @@ ExecNode::GetWorkspace(WorkspaceParams params) {
   if (!params.env)
     params.env = &env;
 
+<<<<<<< HEAD
   ws_event_.reset();
+=======
+  //ws_event_.reset();
+>>>>>>> 10d7ebaef (Ensure there's just one workspace in use. Fix bugs.)
   ws_->set_event(nullptr);
 
   for (int o = 0; o < ws_->NumOutput(); o++) {
