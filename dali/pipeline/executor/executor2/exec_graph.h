@@ -190,10 +190,6 @@ class DLL_PUBLIC ExecNode {
   /** Visit marker for graph algorithms. */
   mutable bool visited = false;
 
-  cudaEvent_t PreviousIterationEvent() const {
-    return prev_event_;
-  }
-
  private:
   /** The task from the previous iteration - kept in order to maintain execution order */
   tasking::SharedTask prev_task_;
@@ -237,9 +233,6 @@ class DLL_PUBLIC ExecNode {
 
   /** The event associated with the workspace */
   SharedEventLease ws_event_;
-
-  /** The completion event of the previous iteration */
-  SharedEventLease prev_event_;
 
   /** Moves to a new iteration. */
   void NextIter() {

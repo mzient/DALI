@@ -179,7 +179,6 @@ void ExecNode::PutWorkspace(std::unique_ptr<Workspace> &&ws) {
   assert(!ws_);
   assert(!ws->has_event() || ws->event() == ws_event_.get());
   ws_ = std::move(ws);
-  prev_event_ = std::move(ws_event_);
 }
 
 void ExecNode::AddDataDeps() {
