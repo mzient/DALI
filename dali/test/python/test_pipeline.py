@@ -626,9 +626,9 @@ def test_make_contiguous_serialize_and_use():
         def define_graph(self):
             inputs, bboxes, labels = self.input()
             images = self.decode(inputs)
-            #crop_begin, crop_size, bboxes, labels = self.crop(bboxes, labels)
-            #images = self.slice(images, crop_begin, crop_size)
-            return images + np.uint8(100)
+            crop_begin, crop_size, bboxes, labels = self.crop(bboxes, labels)
+            images = self.slice(images, crop_begin, crop_size)
+            return images
 
     pipe = COCOPipeline(batch_size=batch_size, num_threads=2, device_id=0)
     serialized_pipeline = pipe.serialize()
