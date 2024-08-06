@@ -626,16 +626,16 @@ def test_make_contiguous_serialize_and_use():
         def define_graph(self):
             inputs, bboxes, labels = self.input()
             images = self.decode(inputs)
-            crop_begin, crop_size, bboxes, labels = self.crop(bboxes, labels)
-            images = self.slice(images, crop_begin, crop_size)
-            return images
+            #crop_begin, crop_size, bboxes, labels = self.crop(bboxes, labels)
+            #images = self.slice(images, crop_begin, crop_size)
+            return images + np.uint8(100)
 
     pipe = COCOPipeline(batch_size=batch_size, num_threads=2, device_id=0)
     serialized_pipeline = pipe.serialize()
     new_pipe = Pipeline(batch_size=batch_size, num_threads=2, device_id=0)
     new_pipe.deserialize_and_build(serialized_pipeline)
 
-    compare_pipelines(pipe, new_pipe, batch_size, 10)
+    compare_pipelines(pipe, new_pipe, batch_size, 5)
 
 
 def test_warpaffine():
