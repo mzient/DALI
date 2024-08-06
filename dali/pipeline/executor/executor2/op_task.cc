@@ -143,10 +143,8 @@ PipelineOutput OpTask::GetOutput() {
 
   std::optional<int> device = {};
   if (ws_->output_order().is_device()) {
-    int dev;
-    CUDA_CALL(cudaGetDevice(&dev));
-    device = dev;
     assert(ws_->event());
+    device = ws_->output_order().device_id();
     CUDA_CALL(cudaEventRecord(ws_->event(), ws_->output_order().stream()));
   }
 
@@ -281,7 +279,6 @@ void OpTask::SetupOp() {
         } else if (ws.OutputIsType<GPUBackend>(i)) {
           auto &output = ws.Output<GPUBackend>(i);
           output.Resize(output_descs[i].shape, output_descs[i].type);
-          CUDA_CALL(cudaMemsetAsync(output.raw_mutable_tensor(0), 128, output_descs[i].shape.num_elements() * TypeTable::GetTypeInfo(output_descs[i].type).size(), ws.stream()));
         } else {
           assert(!"Unreachable code - unknown backend.");
         }
