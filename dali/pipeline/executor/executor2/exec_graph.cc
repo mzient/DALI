@@ -143,7 +143,6 @@ std::unique_ptr<Workspace> ExecNode::CreateOpWorkspace() {
   return ws;
 }
 
-/** Obtains a worskpace from a workspace cache or, if not found, creates a new one. */
 std::pair<std::unique_ptr<Workspace>, SharedEventLease>
 ExecNode::GetWorkspace(WorkspaceParams params) {
   if (!ws_) {
@@ -158,19 +157,14 @@ ExecNode::GetWorkspace(WorkspaceParams params) {
   if (!params.env)
     params.env = &env;
 
-  ws_event_.reset();
-  ws_->set_event(nullptr);
-
-  for (int o = 0; o < ws_->NumOutput(); o++) {
-    if (ws_->OutputIsType<GPUBackend>(o)) {
-      if (!ws_event_)
-        ws_event_ = SharedEventLease::Get();
-      ws_->set_event(ws_event_);
-      break;
-    }
-  }
-
   ApplyWorkspaceParams(*ws_, params);
+
+  if (ws_->output_order().is_device())
+    ws_event_ = SharedEventLease::Get();
+  else
+    ws_event_.reset();
+  ws_->set_event(ws_event_);
+
   return { std::move(ws_), ws_event_ };
 }
 
@@ -193,8 +187,8 @@ void ExecGraph::PrepareIteration(const WorkspaceParams &params) {
   if (nodes_.empty())
     throw std::logic_error("Cannot execute an empty graph");
 
-  if (params.batch_size <= 0)
-    throw std::runtime_error("Batch size must be a positive number.");
+  if (params.max_batch_size <= 0)
+    throw std::runtime_error("Max. batch size must be a positive number.");
 
   Sort();
   Validate();
@@ -203,12 +197,12 @@ void ExecGraph::PrepareIteration(const WorkspaceParams &params) {
   // Create a special task that checks the predicted batch size
   // and populates the respective field in IterationData
   auto prev_infer = infer_batch_size_task_;
-  infer_batch_size_task_ = InferBatchSize(params.iter_data, params.batch_size);
+  infer_batch_size_task_ = InferBatchSize(params.iter_data, params.max_batch_size);
   if (infer_batch_size_task_) {
     if (prev_infer)
       infer_batch_size_task_->Succeed(prev_infer);
   } else {
-    params.iter_data->default_batch_size = params.batch_size;
+    params.iter_data->default_batch_size = params.max_batch_size;
   }
 
   for (auto &n : nodes_) {

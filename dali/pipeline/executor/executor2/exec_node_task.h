@@ -61,7 +61,7 @@ class ExecNodeTask {
 
   template <typename Backend>
   struct OperatorIO {
-    const std::shared_ptr<TensorList<Backend>> data;
+    std::shared_ptr<TensorList<Backend>> data;
     SharedEventLease event;
     AccessOrder order = AccessOrder::host();
   };
@@ -77,6 +77,8 @@ class ExecNodeTask {
   auto GetWorkspace() {
     assert(!ws_);
     std::tie(ws_, event_) = node_->GetWorkspace(ws_params_);
+    assert(ws_ != nullptr);
+    assert(ws_->output_order() && "Workspace must have a valid order");
     return AtScopeExit([this]() {
       ClearWorkspace();
       node_->PutWorkspace(std::move(ws_));

@@ -88,7 +88,7 @@ TEST(ExecGraphTest, SimpleGraph) {
   ExecEnv env;
   env.thread_pool = tp.get();
   params.env = &env;
-  params.batch_size = batch_size;
+  params.max_batch_size = batch_size;
 
   auto iter = std::make_shared<IterationData>();
   params.iter_data = iter;
@@ -149,7 +149,7 @@ TEST(ExecGraphTest, SimpleGraphRepeat) {
   ExecEnv env;
   env.thread_pool = &tp;
   params.env = &env;
-  params.batch_size = batch_size;
+  params.max_batch_size = batch_size;
 
   {
     int N = 100;
@@ -217,7 +217,7 @@ TEST(ExecGraphTest, SimpleGraphScheduleAheadCPU) {
   ExecEnv env;
   env.thread_pool = &tp;
   params.env = &env;
-  params.batch_size = batch_size;
+  params.max_batch_size = batch_size;
 
   int N = 100;
   tasking::Executor ex(4);
@@ -311,7 +311,7 @@ TEST(ExecGraphTest, GraphScheduleAheadGPU) {
   n1->env.thread_pool = &tp;
 
   WorkspaceParams params = {};
-  params.batch_size = batch_size;
+  params.max_batch_size = batch_size;
 
   int N = 100;
   tasking::Executor ex(4);
@@ -384,7 +384,7 @@ TEST(ExecGraphTest, Exception) {
   ExecEnv env;
   env.thread_pool = &tp;
   params.env = &env;
-  params.batch_size = 32;
+  params.max_batch_size = 32;
   {
     tasking::Executor ex(4);
     ex.Start();
@@ -465,7 +465,7 @@ TEST(ExecGraphTest, LoweredExec) {
   ExecEnv env;
   env.thread_pool = &tp;
   params.env = &env;
-  params.batch_size = 32;
+  params.max_batch_size = 32;
   params.iter_data = std::make_shared<IterationData>();
   {
     tasking::Executor ex(4);
@@ -473,7 +473,7 @@ TEST(ExecGraphTest, LoweredExec) {
     g.PrepareIteration(params);
     auto fut = g.Launch(ex);
     auto &out = fut.Value<const PipelineOutput &>();
-    CheckTestGraph1Results(out.workspace, params.batch_size);
+    CheckTestGraph1Results(out.workspace, params.max_batch_size);
   }
 }
 

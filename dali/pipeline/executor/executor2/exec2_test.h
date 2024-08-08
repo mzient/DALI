@@ -19,10 +19,10 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "dali/pipeline/executor/executor2/exec2_ops_for_test.h"
 #include "dali/pipeline/operator/operator.h"
 #include "dali/pipeline/operator/arg_helper.h"
 #include "dali/pipeline/graph/op_graph2.h"
+#include "dali/pipeline/executor/executor2/exec2_ops_for_test.h"
 
 namespace dali {
 namespace exec2 {
