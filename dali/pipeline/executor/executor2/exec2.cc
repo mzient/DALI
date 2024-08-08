@@ -144,7 +144,7 @@ class Executor2::Impl {
 
   void InitIteration() {
     WorkspaceParams params{};
-    params.batch_size = config_.max_batch_size;
+    params.max_batch_size = config_.max_batch_size;
     params.iter_data = InitIterationData(iter_index_++);
     graph_.PrepareIteration(params);
   }
