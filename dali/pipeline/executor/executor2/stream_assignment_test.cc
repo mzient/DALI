@@ -44,7 +44,7 @@ DALI_SCHEMA(StreamAssignmentDummyOp)
   });
 
 DALI_REGISTER_OPERATOR(StreamAssignmentDummyOp, StreamAssignmentDummyOp<CPUBackend>, CPU);
-
+DALI_REGISTER_OPERATOR(StreamAssignmentDummyOp, StreamAssignmentDummyOp<MixedBackend>, Mixed);
 DALI_REGISTER_OPERATOR(StreamAssignmentDummyOp, StreamAssignmentDummyOp<GPUBackend>, GPU);
 
 namespace exec2 {
@@ -66,6 +66,10 @@ OpSpec SpecCPU() {
   return SpecDev("cpu");
 }
 
+OpSpec SpecMixed() {
+  return SpecDev("mixed");
+}
+
 auto MakeNodeMap(const ExecGraph &graph) {
   std::map<std::string_view, const ExecNode *, std::less<>> map;
   for (auto &n : graph.Nodes())
@@ -77,15 +81,70 @@ auto MakeNodeMap(const ExecGraph &graph) {
 
 }  // namespace
 
-TEST(Exec2Test, StreamAssignment_PerOperator) {
+
+TEST(Exec2Test, StreamAssignment_PerOperator_1) {
+  ExecGraph eg;
+  /*
+  a -- b ----- c --------- g --  out
+   \                      /
+    ---d -- e (cpu)---f (mixed)
+
+  */
+  graph::OpGraph::Builder b;
+  b.Add("a",
+        SpecGPU()
+        .AddOutput("a->b", "gpu")
+        .AddOutput("a->d", "gpu"));
+  b.Add("b",
+        SpecGPU()
+        .AddInput("a->b", "gpu")
+        .AddOutput("b->c", "gpu"));
+  b.Add("c",
+        SpecGPU()
+        .AddInput("b->c", "gpu")
+        .AddOutput("c->g", "gpu"));
+  b.Add("d",
+        SpecGPU()
+        .AddInput("a->d", "gpu")
+        .AddOutput("d->e", "cpu"));
+  b.Add("e",
+        SpecCPU()
+        .AddInput("d->e", "cpu")
+        .AddOutput("e->f", "cpu"));
+  b.Add("f",
+        SpecMixed()
+        .AddInput("e->f", "cpu")
+        .AddOutput("f->g", "gpu"));
+  b.Add("g",
+        SpecGPU()
+        .AddInput("c->g", "gpu")
+        .AddInput("f->g", "gpu")
+        .AddOutput("g->o", "gpu"));
+  b.AddOutput("g->o_gpu");
+  auto g = std::move(b).GetGraph(true);
+  eg.Lower(g);
+
+  StreamAssignment<StreamPolicy::PerOperator> assignment(eg);
+  auto map = MakeNodeMap(eg);
+  EXPECT_EQ(assignment[map["a"]], 0);
+  EXPECT_EQ(assignment[map["b"]], 0);
+  EXPECT_EQ(assignment[map["c"]], 0);
+  EXPECT_EQ(assignment[map["d"]], 1);
+  EXPECT_EQ(assignment[map["e"]], std::nullopt);
+  EXPECT_EQ(assignment[map["f"]], 1);
+  EXPECT_EQ(assignment[map["g"]], 0);
+}
+
+
+TEST(Exec2Test, StreamAssignment_PerOperator_2) {
   ExecGraph eg;
   /*
          --c--             g
         /     \         /   \
   a -- b ----- d ----- f ---- h ---> out
    \   (cpu)       /       /
-    --------------e        /
-                        /
+    --------------e       /
+                         /
   i ----------------- j(cpu)
 
   k ----------------------------> out
