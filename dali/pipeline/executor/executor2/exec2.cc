@@ -21,6 +21,9 @@
 #include "dali/pipeline/executor/executor2/exec2.h"
 #include "dali/pipeline/executor/executor2/exec_graph.h"
 #include "dali/pipeline/executor/executor2/stream_assignment.h"
+#if NVML_ENABLED
+#include "dali/util/nvml.h"
+#endif
 
 namespace dali {
 namespace exec2 {
@@ -313,13 +316,44 @@ class Executor2::Impl {
   void Start() {
     if (state_ != State::Built)
       throw std::logic_error("Incorrect state transition.");
+
+#if NVML_ENABLED
+  // We use NVML only for setting thread affinity
+  if (config_.device.has_value() && config_.set_affinity) {
+    nvml_handle_ = nvml::NvmlInstance::CreateNvmlInstance();
+  }
+#endif
+
     exec_ = std::make_unique<tasking::Executor>(config_.operator_threads);
-    exec_->Start([this](){
-      if (config_.device)
+    exec_->Start([this](int thread_idx){
+      if (config_.device) {
         CUDA_CALL(cudaSetDevice(*config_.device));
+#if NVML_ENABLED
+        if (config_.set_affinity) {
+          const char *env_affinity = std::getenv("DALI_AFFINITY_MASK");
+          int core = -1;
+          if (env_affinity) {
+            const auto &vec = string_split(env_affinity, ',');
+            if ((size_t)thread_idx < vec.size()) {
+              core = std::stoi(vec[thread_idx]);
+            } else {
+              DALI_WARN("DALI_AFFINITY_MASK environment variable is set, "
+                        "but does not have enough entries: thread_idx (", thread_idx,
+                        ") vs #entries (", vec.size(), "). Ignoring...");
+            }
+          }
+          nvml::SetCPUAffinity(core);
+        }
+#endif
+      }
     });
     state_ = State::Running;
   }
+
+#if NVML_ENABLED
+  nvml::NvmlInstance nvml_handle_;
+#endif
+
 
   void SetupStreams() {
     switch (config_.stream_policy) {

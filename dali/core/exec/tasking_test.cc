@@ -40,7 +40,7 @@ TEST(TaskingTest, ExecutorSetup) {
   static thread_local int tls = 0;
   int num_threads = 32;
   Executor ex(num_threads);
-  ex.Start([]() { tls = 42; });  // set thread-local value
+  ex.Start([](int) { tls = 42; });  // set thread-local value
   std::atomic_int correct{0}, incorrect{0};
   auto complete = Task::Create([](){});
   int num_tasks = num_threads * 8;  // launch a lot of tasks - all taks must see the expected value

@@ -42,14 +42,14 @@ class Executor : public Scheduler {
    *
    * @param thread_setup A function executed before the main loop.
    */
-  void Start(std::function<void()> thread_setup = {}) {
+  void Start(std::function<void(int thread_idx)> thread_setup = {}) {
     if (started_)
       return;
     assert(workers_.empty());
     for (int i = 0; i < num_threads_; i++)
-      workers_.emplace_back([thread_setup, this]() {
+      workers_.emplace_back([i, thread_setup, this]() {
         if (thread_setup)
-          thread_setup();
+          thread_setup(i);
         RunWorker();
       });
     started_ = true;
