@@ -1,4 +1,4 @@
-// Copyright (c) 2019, 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2019, 2022, 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,11 +36,85 @@
 #include "dali/test/cv_mat_utils.h"
 #include "dali/test/tensor_test_utils.h"
 #include "dali/test/test_tensors.h"
+#include "dali/core/output_stream.h"
 
 using std::cout;
 using std::endl;
 
 namespace dali {
+namespace numpy {
+
+template <typename T, int ndim>
+std::string MakeHeader(const TensorShape<ndim> &shape) {
+  const char *type = "";
+  if constexpr (std::is_same_v<T, bool>)
+    type = "b";
+  else if constexpr (std::is_integral_v<T>)
+    type = std::is_signed_v<T> ? "i" : "u";
+  else if constexpr (std::is_floating_point_v<T>)
+    type = "f";
+  else
+    throw std::invalid_argument("Unsupported type.");
+  std::stringstream ss;
+  print(ss, "{'descr':'<", type, sizeof(T), "', 'fortran_order':False, 'shape':(");
+  join(ss, shape);
+  print(ss, "), }\n");
+  return ss.str();
+}
+
+inline void WriteHeader(OutputStream &out, std::string_view header) {
+  const int kAlignment = 16;
+  const char padding[kAlignment] = "               ";
+  const char magic[] = "\x93NUMPY";
+  const char version[] = { 1, 0 };
+  int min_header = header.length() + 6 + 2 + 2;
+  int aligned_header = align_up(min_header, kAlignment);
+  int padding_length = aligned_header - min_header;
+  assert(padding_length < kAlignment);
+  out.WriteBytes(magic, 6);
+  out.WriteBytes(version, 2);
+  out.WriteOne(static_cast<uint16_t>(aligned_header - (6 + 2 + 2)));
+  out.WriteBytes(header.data(), header.length());
+  out.WriteBytes(padding, padding_length);
+}
+
+template <typename T, int ndim>
+void WriteTensor(OutputStream &out, const TensorView<StorageCPU, T, ndim> &tv) {
+  WriteHeader(out, MakeHeader<T>(tv.shape));
+  out.WriteAll(tv.data, tv.num_elements());
+}
+
+template <typename T, int ndim>
+void WriteTensor(std::string_view filename, const TensorView<StorageCPU, T, ndim> &tv) {
+  FILE *f = fopen(filename.data(), "wb");
+  if (!f)
+    throw std::runtime_error(make_string("Cannot open \"", filename, "\" for writing."));
+  FileOutputStream out(f);
+  WriteTensor(out, tv);
+}
+
+template <typename T, int ndim>
+void WriteTensors(std::string_view prefix, const TensorListView<StorageCPU, T, ndim> &tlv) {
+  for (int i = 0; i < tlv.num_samples(); i++) {
+    WriteTensor(make_string(prefix,"_", i, ".npy"), tlv[i]);
+  }
+}
+
+template <typename T, int ndim>
+void WriteTensors(std::string_view prefix, const TensorListView<StorageGPU, T, ndim> &tlv) {
+  kernels::TestTensorList<T, ndim> ttl;
+  ttl.reshape(tlv.shape);
+  auto tlv_cpu = ttl.cpu();
+  for (int i = 0; i < tlv.num_samples(); i++) {
+    CUDA_CALL(cudaMemcpyAsync(tlv_cpu[i].data, tlv[i].data, sizeof(T) * tlv[i].num_elements(),
+                              cudaMemcpyDeviceToHost));
+  }
+  CUDA_CALL(cudaDeviceSynchronize());
+  WriteTensors(prefix, tlv_cpu);
+}
+
+}  // namespace numpy
+
 namespace kernels {
 namespace resample_test {
 
@@ -236,6 +310,9 @@ void Resample3Dvia2D(TestTensorList<Out> &out,
   const auto &in_shape = in_view.shape;
   assert(in_shape.sample_dim() == 4);
 
+  numpy::WriteTensors("in", in.cpu());
+
+
   TensorListShape<4> tmp_shape, out_shape;
   int N = in_shape.num_samples();
   tmp_shape.resize(N);
@@ -284,6 +361,7 @@ void Resample3Dvia2D(TestTensorList<Out> &out,
   GetZParams(params_z, params, tmp_shape);
   auto tmp_z = GetZImages(tmp_view);
   auto out_z = GetZImages(out_view);
+  numpy::WriteTensors("tmp_z", tmp_z);
 
   {
     ResampleGPU<Out, float, 2> res_z;
@@ -297,6 +375,7 @@ void Resample3Dvia2D(TestTensorList<Out> &out,
     assert(req.output_shapes[0] == out_z.shape);
     res_z.Run(ctx, out_z, tmp_z, make_span(params_z));
   }
+  numpy::WriteTensors("out_z", out_z);
 }
 
 template <typename TestParams>
