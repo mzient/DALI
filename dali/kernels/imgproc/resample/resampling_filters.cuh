@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ struct ResamplingFilter {
     float f0 = x0 < 0.0f ? 0 : coeffs[x0];
     float f1 = x1 >= num_coeffs ? 0.0f : coeffs[x1];
 #endif
-    return f0 + d * (f1 - f0);
+    return fmaf(d, f1 - f0, f0);
   }
 };
 
