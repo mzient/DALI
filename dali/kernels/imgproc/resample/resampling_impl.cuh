@@ -80,7 +80,7 @@ __device__ void ResampleHorz_Channels(
 
   for (int j = lo.x; j < hi.x; j += blockDim.x) {
     int dx = j + threadIdx.x;
-    const float sx0f = dx * scale + src_x0;
+    const float sx0f = fmaf(dx, scale, src_x0);
     const int sx0 = huge_kernel ? __float2int_rn(sx0f) : __float2int_ru(sx0f);
     float f = (sx0 - sx0f) * filter_step;
     __syncthreads();
@@ -198,7 +198,7 @@ __device__ void ResampleHorz_Channels(
 
   for (int j = lo.x; j < hi.x; j += blockDim.x) {
     int dx = j + threadIdx.x;
-    const float sx0f = dx * scale + src_x0;
+    const float sx0f = fmaf(dx, scale, src_x0);
     const int sx0 = huge_kernel ? __float2int_rn(sx0f) : __float2int_ru(sx0f);
     float f = (sx0 - sx0f) * filter_step;
     __syncthreads();
@@ -307,7 +307,7 @@ __device__ void ResampleVert_Channels(
 
   for (int i = lo.y; i < hi.y; i+=blockDim.y) {
     int dy = i + threadIdx.y;
-    const float sy0f = dy * scale + src_y0;
+    const float sy0f = fmaf(dy, scale, src_y0);
     const int sy0 = huge_kernel ? __float2int_rn(sy0f) : __float2int_ru(sy0f);
     float f = (sy0 - sy0f) * filter_step;
     __syncthreads();
@@ -413,7 +413,7 @@ __device__ void ResampleVert_Channels(
 
   for (int i = lo.y; i < hi.y; i+=blockDim.y) {
     int dy = i + threadIdx.y;
-    const float sy0f = dy * scale + src_y0;
+    const float sy0f = fmaf(dy, scale, src_y0);
     const int sy0 = huge_kernel ? __float2int_rn(sy0f) : __float2int_ru(sy0f);
     float f = (sy0 - sy0f) * filter_step;
     __syncthreads();
@@ -531,7 +531,7 @@ __device__ void ResampleDepth_Channels(
   // threadIdx.y is used to traverse Z axis
   for (int i = lo.z; i < hi.z; i+=blockDim.y) {
     int dz = i + threadIdx.y;
-    const float sz0f = dz * scale + src_z0;
+    const float sz0f = fmaf(dz, scale, src_z0);
     const int sz0 = huge_kernel ? __float2int_rn(sz0f) : __float2int_ru(sz0f);
     float f = (sz0 - sz0f) * filter_step;
     __syncthreads();
