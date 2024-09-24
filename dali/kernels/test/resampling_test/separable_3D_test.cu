@@ -96,7 +96,7 @@ void WriteTensor(std::string_view filename, const TensorView<StorageCPU, T, ndim
 template <typename T, int ndim>
 void WriteTensors(std::string_view prefix, const TensorListView<StorageCPU, T, ndim> &tlv) {
   for (int i = 0; i < tlv.num_samples(); i++) {
-    WriteTensor(make_string(prefix,"_", i, ".npy"), tlv[i]);
+    WriteTensor(make_string(prefix, "_", i, ".npy"), tlv[i]);
   }
 }
 
@@ -357,6 +357,7 @@ void Resample3Dvia2D(TestTensorList<Out> &out,
     assert(req.output_shapes[0] == tmp_slices.shape);
     res_xy.Run(ctx, tmp_slices, in_slices, make_span(params_xy));
   }
+  numpy::WriteTensors("tmp", tmp.cpu());
 
   GetZParams(params_z, params, tmp_shape);
   auto tmp_z = GetZImages(tmp_view);
@@ -376,6 +377,7 @@ void Resample3Dvia2D(TestTensorList<Out> &out,
     res_z.Run(ctx, out_z, tmp_z, make_span(params_z));
   }
   numpy::WriteTensors("out_z", out_z);
+  numpy::WriteTensors("out", out.cpu());
 }
 
 template <typename TestParams>
