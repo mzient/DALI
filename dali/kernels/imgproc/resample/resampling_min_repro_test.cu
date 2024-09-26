@@ -10,33 +10,33 @@ void ShowResamplingResults() {
   ResampleGPU<Out, In> res;
   TestTensorList<In> inp;
   TestTensorList<Out> out;
-  int w = 5;
-  int ow = 4;
-  out.reshape(uniform_list_shape(1, { 1, ow, 1 }));
-  inp.reshape(uniform_list_shape(1, { 1, w, 1 }));
+  int h = 5;
+  int oh = 4;
+  out.reshape(uniform_list_shape(1, { oh, 1, 1 }));
+  inp.reshape(uniform_list_shape(1, { h, 1, 1 }));
   auto in_cpu = inp.cpu();
-  for (int x = 0; x < w; x++) {
-    in_cpu.data[0][x] = x == 1 ? 3 << 14 : 2 << 14;
+  for (int y = 0; y < h; y++) {
+    in_cpu.data[0][y] = y == 1 ? 52767 : 32767;
   }
   DynamicScratchpad scratch;
   KernelContext ctx = {};
   ctx.gpu.stream = 0;
   ctx.scratchpad = &scratch;
   ResamplingParams2D params{};
-  params[0].output_size = 1;
-  params[0].mag_filter = params[0].min_filter = FilterDesc(ResamplingFilterType::Nearest, false, 1);
+  params[0].output_size = oh;
+  float r = DefaultFilterRadius(ResamplingFilterType::Cubic, true, h, oh);
+  params[0].mag_filter = params[0].min_filter = FilterDesc(ResamplingFilterType::Cubic, true, r);
 
-  params[1].output_size = ow;
-  float r = DefaultFilterRadius(ResamplingFilterType::Cubic, true, w, ow);
-  params[1].mag_filter = params[1].min_filter = FilterDesc(ResamplingFilterType::Cubic, true, r);
+  params[1].output_size = 1;
+  params[1].mag_filter = params[1].min_filter = FilterDesc(ResamplingFilterType::Nearest, false, 1);
   (void)res.Setup(ctx, inp.gpu().to_static<3>(), make_span(&params, 1));
   res.Run(ctx, out.gpu().to_static<3>(), inp.gpu().to_static<3>(), make_span(&params, 1));
   auto out_cpu = out.cpu();
   CUDA_CALL(cudaDeviceSynchronize());
-  for (int x = 0; x < ow; x++) {
-    std::cout << (double)out_cpu[0].data[x] << " ";
+  for (int y = 0; y < oh; y++) {
+    printf("%f ", out_cpu[0].data[y]);
   }
-  std::cout << endl;
+  printf("\n");
 
 }
 
