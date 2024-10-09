@@ -1367,7 +1367,6 @@ class Pipeline(object):
             self.schedule_run()
             return self.outputs(cuda_stream)
 
-
     def _prefetch(self):
         """Executes pipeline to fill executor's pipeline."""
         if not self._built:
