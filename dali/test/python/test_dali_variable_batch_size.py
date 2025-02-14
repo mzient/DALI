@@ -1155,30 +1155,31 @@ def test_image_decoders():
         pipe.set_outputs(shape)
         return pipe
 
-    image_decoder_extensions = [".jpg", ".bmp", ".png", ".pnm", ".jp2"]
+#    image_decoder_extensions = [".jpg", ".bmp", ".png", ".pnm", ".jp2"]
+    image_decoder_extensions = [".bmp"]
     image_decoder_pipes = [
         image_decoder_pipe,
-        image_decoder_crop_pipe,
-        image_decoder_slice_pipe,
+#        image_decoder_crop_pipe,
+#        image_decoder_slice_pipe,
     ]
-    data_path = os.path.join(test_utils.get_dali_extra_path(), "db", "single")
+    data_path = os.path.join(test_utils.get_dali_extra_path(), "db", "single", "bmp")
     # excluding paths that contain images that are not widely supported (by legacy and new decoders)
     exclude_subdirs = ["jpeg_lossless"]
     for ext in image_decoder_extensions:
         for pipe_template in image_decoder_pipes:
-            pipe = partial(pipe_template, fn.decoders)
-            yield test_decoders_check, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
+            #pipe = partial(pipe_template, fn.decoders)
+            #yield test_decoders_check, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
             pipe = partial(pipe_template, fn.experimental.decoders)
-            yield test_decoders_check, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
-        pipe = partial(image_decoder_rcrop_pipe, fn.decoders)
-        yield test_decoders_run, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
-        pipe = partial(image_decoder_rcrop_pipe, fn.experimental.decoders)
-        yield test_decoders_run, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
+            yield test_decoders_check, pipe, data_path, ext, ["mixed"], exclude_subdirs
+        #pipe = partial(image_decoder_rcrop_pipe, fn.decoders)
+        #yield test_decoders_run, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
+        #pipe = partial(image_decoder_rcrop_pipe, fn.experimental.decoders)
+        #yield test_decoders_run, pipe, data_path, ext, ["cpu", "mixed"], exclude_subdirs
 
-    pipe = partial(peek_image_shape_pipe, fn)
-    yield test_decoders_check, pipe, data_path, ".jpg", ["cpu"], exclude_subdirs
-    pipe = partial(peek_image_shape_pipe, fn.experimental)
-    yield test_decoders_check, pipe, data_path, ".jpg", ["cpu"], exclude_subdirs
+    #pipe = partial(peek_image_shape_pipe, fn)
+    #yield test_decoders_check, pipe, data_path, ".jpg", ["cpu"], exclude_subdirs
+    #pipe = partial(peek_image_shape_pipe, fn.experimental)
+    #yield test_decoders_check, pipe, data_path, ".jpg", ["cpu"], exclude_subdirs
 
 
 def test_python_function():

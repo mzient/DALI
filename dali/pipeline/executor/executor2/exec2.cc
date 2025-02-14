@@ -98,11 +98,14 @@ class Executor2::Impl {
       throw std::logic_error("Already built.");
 
     if (config_.device.has_value()) {
-      int n;
-      CUDA_CALL(cudaGetDeviceCount(&n));
-      if (*config_.device < 0 || *config_.device >= n)
+      static int ndev = []() {
+        int n;
+        CUDA_CALL(cudaGetDeviceCount(&n));
+        return n;
+      }();
+      if (*config_.device < 0 || *config_.device >= ndev)
         throw std::invalid_argument(make_string("The device_id=", *config_.device, " is invalid. "
-            "Valid range is [0..", n-1, "]"));
+            "Valid range is [0..", ndev-1, "]"));
     }
 
     state_ = State::Building;

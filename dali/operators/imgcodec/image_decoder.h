@@ -685,6 +685,16 @@ class ImageDecoder : public StatelessOperator<Backend> {
     decode_sample_idxs_.reserve(nsamples);
     decode_status_.clear();
 
+    if (ws.has_stream()) {
+      CUDA_CALL(cudaStreamSynchronize(ws.stream()));
+      size_t chunk = 64<<20;
+      int iters = 100;
+      auto mem = mm::alloc_raw_unique<char, mm::memory_kind::device>(chunk);
+      for (int i = 0; i < iters; i++) {
+        CUDA_CALL(cudaMemsetAsync(mem.get(), i, chunk, ws.stream()));
+      }
+    }
+
     const bool use_cache = cache_ && cache_->IsCacheEnabled() && dtype_ == DALI_UINT8;
     auto setup_block = [&](int block_idx, int nblocks, int tid) {
       int i_start = nsamples * block_idx / nblocks;
@@ -834,6 +844,7 @@ class ImageDecoder : public StatelessOperator<Backend> {
             tp_->AddWork(
                 [&, out = output[orig_idx], st_ptr, orig_idx](int tid) {
                   DomainTimeRange tr(make_string("Convert #", orig_idx), DomainTimeRange::kOrange);
+                  std::cout << "Converting sample " << orig_idx << std::endl;
                   auto &st = *st_ptr;
                   if constexpr (std::is_same<MixedBackend, Backend>::value) {
                     ConvertGPU(out, st.req_layout, st.req_img_type, st.decode_out_gpu,
@@ -851,6 +862,8 @@ class ImageDecoder : public StatelessOperator<Backend> {
           }
         }
         tp_->RunAll(true);
+      } else {
+        std::cout << "No processing needed." << std::endl;
       }
     }
 
