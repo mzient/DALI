@@ -57,7 +57,11 @@ inline std::string ValidDevices(InputDevice required, OpType op_device) {
   }
 }
 
-OpSpec &OpSpec::AddInput(std::string name, StorageDevice device, bool regular_input) {
+OpSpec &OpSpec::AddInput(
+      std::string name,
+      StorageDevice device,
+      bool regular_input,
+      InOutSpec spec) {
   if (regular_input) {
     // We rely on the fact that regular inputs are first in inputs_ vector
     DALI_ENFORCE(NumArgumentInput() == 0,
@@ -85,7 +89,7 @@ OpSpec &OpSpec::AddInput(std::string name, StorageDevice device, bool regular_in
       "\" for a named input \"", name, "\". All named inputs must be on CPU."));
   }
 
-  inputs_.push_back({std::move(name), device});
+  inputs_.push_back({std::move(name), device, spec});
   return *this;
 }
 
@@ -101,7 +105,17 @@ OpSpec &OpSpec::AddOutput(std::string name, StorageDevice device) {
   return *this;
 }
 
-OpSpec &OpSpec::AddArgumentInput(std::string arg_name, std::string inp_name) {
+void OpSpec::InferOutputSpecs() {
+  if (output_specs_inferred_)
+    return;
+  auto &schema = GetSchemaOrDefault();
+  for (int i = 0; i < NumOutput(); ++i) {
+    outputs_[i].spec = schema.InferOutputSpec(*this, i);
+  }
+  output_specs_inferred_ = true;
+}
+
+OpSpec &OpSpec::AddArgumentInput(std::string arg_name, std::string inp_name, InOutSpec spec) {
   DALI_ENFORCE(!this->HasArgument(arg_name), make_string(
       "Argument '", arg_name, "' is already specified."));
   const OpSchema &schema = GetSchemaOrDefault();
@@ -114,7 +128,7 @@ OpSpec &OpSpec::AddArgumentInput(std::string arg_name, std::string inp_name) {
   int idx = inputs_.size();
   argument_input_idxs_[arg_name] = idx;
   argument_inputs_.push_back({ std::move(arg_name), idx });
-  AddInput(std::move(inp_name), StorageDevice::CPU, false);
+  AddInput(std::move(inp_name), StorageDevice::CPU, false, spec);
   return *this;
 }
 

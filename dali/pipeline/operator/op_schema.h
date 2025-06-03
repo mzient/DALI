@@ -150,9 +150,52 @@ struct LazyValue {
 }  // namespace detail
 
 
+/** Describes the expected type, number of dimensions, and layout of an input or output.
+ *
+ * This structure is used for statically checking the consistency of the input and output tensors.
+ */
+struct InOutSpec {
+  std::optional<DALIDataType> dtype;
+  std::optional<int> ndim;
+  std::optional<TensorLayout> layout;
+};
+
+namespace output_spec_funcs {
+DLL_PUBLIC inline InOutSpec None(const OpSpec &spec, int) {
+  return {};
+}
+
+DLL_PUBLIC inline InOutSpec Default(const OpSpec &spec, int idx) {
+  if (spec.NumOutput() != 1)
+    throw std::invalid_argument("DefaultOutputSpec requires exactly one output");
+  auto output_spec = spec.InputSpec(0);
+
+  if (spec.HasArgument("dtype")) {
+    output_spec.dtype = spec.GetArgument<DALIDataType>("dtype");
+  }
+  if (spec.HasArgument("layout")) {
+    output_spec.layout = spec.GetArgument<TensorLayout>("layout");
+    output_spec.ndim = output_spec.layout.value().ndim()
+  }
+  return output_spec;
+}
+
+DLL_PUBLIC inline InOutSpec Passthrough(const OpSpec &spec, int idx) {
+  if (spec.NumRegularInput() != spec.NumOutput()) {
+    throw std::invalid_argument(
+      "PassthroughOutputSpec requires the same number of inputs and outputs");
+  }
+  return spec.InputSpec(idx);
+}
+
+};
+
 class DLL_PUBLIC OpSchema {
  public:
-  typedef std::function<int(const OpSpec &spec)> SpecFunc;
+  typedef std::function<int(const OpSpec &spec)> NumOutputsFunc;
+  typedef std::function<bool(const OpSpec &spec)> InPlaceFunc;
+
+  typedef std::function<std::vector<InOutSpec>(const OpSpec &spec)> OutputSpecFunc;
 
   OpSchema(OpSchema &&) = delete;
   OpSchema(const OpSchema &) = delete;
@@ -224,7 +267,7 @@ class DLL_PUBLIC OpSchema {
    * If the ops has a fixed number of outputs, this function
    * does not need to be added to the schema.
    */
-  OpSchema &OutputFn(SpecFunc f);
+  OpSchema &OutputFn(NumOutputfunc f);
 
   /**  Sets a function to determine the number of additional outputs from the OpSpec.
    *
@@ -234,7 +277,7 @@ class DLL_PUBLIC OpSchema {
    * Use case is to expose additional information (such as random
    * numbers used within operators) to the user
    */
-  OpSchema &AdditionalOutputsFn(SpecFunc f);
+  OpSchema &AdditionalOutputsFn(NumOutputFunc f);
 
   /** Sets the number of inputs that the op can receive. */
   OpSchema &NumInput(int n);
@@ -477,7 +520,7 @@ used with DALIDataType, to avoid confusion with `AddOptionalArg<type>(name, doc,
    * @brief Sets a function that infers whether the op can
    *        be executed in-place depending on the ops specification.
    */
-  OpSchema &InPlaceFn(SpecFunc f);
+  OpSchema &InPlaceFn(InPlaceFunc f);
 
   /** Sets a parent (which could be used as a storage of default parameters)
    *
@@ -647,6 +690,21 @@ used with DALIDataType, to avoid confusion with `AddOptionalArg<type>(name, doc,
   /** Calculate the number of additional outputs obtained from additional_outputs_fn */
   int CalculateAdditionalOutputs(const OpSpec &spec) const;
 
+  /** Infer the output spec for a given output index
+   *
+   * This function computes the output spec for a given output index for an operator
+   * specified by the given OpSpec.
+   *
+   * @param spec - the operator specification
+   * @param output_idx - the index of the output
+   * @return the inferred output spec; empty if the output spec cannot be inferred statically.
+   */
+  InOutSpec InferOutputSpec(const OpSpec &spec, int output_idx) const {
+    if (!output_spec_fn_)
+      return {};
+    return output_spec_fn_(spec, output_idx);
+  }
+
   bool SupportsInPlace(const OpSpec &spec) const;
 
   void CheckArgs(const OpSpec &spec) const;
@@ -782,7 +840,9 @@ used with DALIDataType, to avoid confusion with `AddOptionalArg<type>(name, doc,
   bool disable_auto_input_dox_ = false;
   bool input_dox_set_ = false;
 
-  SpecFunc output_fn_, in_place_fn_, additional_outputs_fn_;
+  NumOutputFunc output_fn_, additional_outputs_fn_;
+  InPlaceFunc in_place_fn_;
+  OutputSpecFunc output_spec_fn_;
 
   int min_num_input_ = 0, max_num_input_ = 0;
   int num_output_ = 0;

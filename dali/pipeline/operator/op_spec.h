@@ -66,6 +66,10 @@ class DLL_PUBLIC OpSpec {
     }
   };
 
+  struct InOutDesc : InOutDeviceDesc {
+    std::optional<InOutSpec> spec;
+  };
+
   OpSpec() = default;
 
   /** Returns a full tensor name given its name and device */
@@ -186,7 +190,7 @@ class DLL_PUBLIC OpSpec {
    * which inputs are added to the OpSpec is the order in
    * which the Operator will receive them.
    */
-  OpSpec &AddInput(std::string name, StorageDevice device, bool regular_input = true);
+  OpSpec &AddInput(std::string name, StorageDevice device, bool regular_input = true, InOutSpec spec = {});
 
   /**
    * @brief Specifies the argument input to the op.
@@ -194,7 +198,7 @@ class DLL_PUBLIC OpSpec {
    * per-iteration arguments. The input may be added only if
    * corresponding argument exists in the schema.
    */
-  OpSpec &AddArgumentInput(std::string arg_name, std::string inp_name);
+  OpSpec &AddArgumentInput(std::string arg_name, std::string inp_name, InOutSpec spec = {});
 
   /**
    * @brief Specifies the name and device (cpu or gpu) of an
@@ -206,6 +210,8 @@ class DLL_PUBLIC OpSpec {
    * which the Operator will receive them.
    */
   OpSpec &AddOutput(std::string name, StorageDevice device);
+
+  void InferOutputSpecs();
 
   int NumInput() const { return inputs_.size(); }
 
@@ -232,6 +238,11 @@ class DLL_PUBLIC OpSpec {
   StorageDevice InputDevice(int idx) const {
     DALI_ENFORCE_VALID_INDEX(idx, NumInput());
     return inputs_[idx].device;
+  }
+
+  InOutSpec InputSpec(int idx) const {
+    DALI_ENFORCE_VALID_INDEX(idx, NumInput());
+    return inputs_[idx].spec;
   }
 
   bool IsArgumentInput(int idx) const {
@@ -265,6 +276,14 @@ class DLL_PUBLIC OpSpec {
   StorageDevice OutputDevice(int idx) const {
     DALI_ENFORCE_VALID_INDEX(idx, NumOutput());
     return outputs_[idx].device;
+  }
+
+  InOutSpec OutputSpec(int idx) const {
+    DALI_ENFORCE_VALID_INDEX(idx, NumOutput());
+    if (!output_specs_inferred_)
+      const_cast<OpSpec*>(this)->InferOutputSpecs();
+
+    return outputs_[idx].spec;
   }
 
   int OutputIdxForName(std::string_view name, StorageDevice device) const {
@@ -463,7 +482,8 @@ class DLL_PUBLIC OpSpec {
   // Maps regular_argument -> deprecated_argument
   std::map<std::string, std::string, std::less<>> set_through_deprecated_arguments_;
 
-  vector<InOutDeviceDesc> inputs_, outputs_;
+  vector<InOutDesc> inputs_, outputs_;
+  bool output_specs_inferred_ = false;
   std::map<InOutDeviceDesc, int, std::less<>> output_name_idx_;
 };
 
