@@ -165,28 +165,9 @@ DLL_PUBLIC inline InOutSpec None(const OpSpec &spec, int) {
   return {};
 }
 
-DLL_PUBLIC inline InOutSpec Default(const OpSpec &spec, int idx) {
-  if (spec.NumOutput() != 1)
-    throw std::invalid_argument("DefaultOutputSpec requires exactly one output");
-  auto output_spec = spec.InputSpec(0);
+DLL_PUBLIC InOutSpec Default(const OpSpec &spec, int idx);
 
-  if (spec.HasArgument("dtype")) {
-    output_spec.dtype = spec.GetArgument<DALIDataType>("dtype");
-  }
-  if (spec.HasArgument("layout")) {
-    output_spec.layout = spec.GetArgument<TensorLayout>("layout");
-    output_spec.ndim = output_spec.layout.value().ndim()
-  }
-  return output_spec;
-}
-
-DLL_PUBLIC inline InOutSpec Passthrough(const OpSpec &spec, int idx) {
-  if (spec.NumRegularInput() != spec.NumOutput()) {
-    throw std::invalid_argument(
-      "PassthroughOutputSpec requires the same number of inputs and outputs");
-  }
-  return spec.InputSpec(idx);
-}
+DLL_PUBLIC InOutSpec Passthrough(const OpSpec &spec, int idx);
 
 };
 
@@ -267,7 +248,7 @@ class DLL_PUBLIC OpSchema {
    * If the ops has a fixed number of outputs, this function
    * does not need to be added to the schema.
    */
-  OpSchema &OutputFn(NumOutputfunc f);
+  OpSchema &OutputFn(NumOutputsFunc f);
 
   /**  Sets a function to determine the number of additional outputs from the OpSpec.
    *
@@ -277,7 +258,7 @@ class DLL_PUBLIC OpSchema {
    * Use case is to expose additional information (such as random
    * numbers used within operators) to the user
    */
-  OpSchema &AdditionalOutputsFn(NumOutputFunc f);
+  OpSchema &AdditionalOutputsFn(NumOutputsFunc f);
 
   /** Sets the number of inputs that the op can receive. */
   OpSchema &NumInput(int n);
@@ -840,7 +821,7 @@ used with DALIDataType, to avoid confusion with `AddOptionalArg<type>(name, doc,
   bool disable_auto_input_dox_ = false;
   bool input_dox_set_ = false;
 
-  NumOutputFunc output_fn_, additional_outputs_fn_;
+  NumOutputsFunc output_fn_, additional_outputs_fn_;
   InPlaceFunc in_place_fn_;
   OutputSpecFunc output_spec_fn_;
 

@@ -1040,4 +1040,28 @@ bool OpSchema::HasArgument(std::string_view name, bool include_internal) const {
     return false;
 }
 
+namespace output_spec_funcs {
+DLL_PUBLIC InOutSpec Default(const OpSpec &spec, int idx) {
+  if (spec.NumOutput() != 1)
+    throw std::invalid_argument("DefaultOutputSpec requires exactly one output");
+  auto output_spec = spec.InputSpec(0);
+
+  if (spec.HasArgument("dtype")) {
+    output_spec.dtype = spec.GetArgument<DALIDataType>("dtype");
+  }
+  if (spec.HasArgument("layout")) {
+    output_spec.layout = spec.GetArgument<TensorLayout>("layout");
+    output_spec.ndim = output_spec.layout.value().ndim()
+  }
+  return output_spec;
+}
+
+DLL_PUBLIC InOutSpec Passthrough(const OpSpec &spec, int idx) {
+  if (spec.NumRegularInput() != spec.NumOutput()) {
+    throw std::invalid_argument(
+      "PassthroughOutputSpec requires the same number of inputs and outputs");
+  }
+  return spec.InputSpec(idx);
+}
+
 }  // namespace dali
