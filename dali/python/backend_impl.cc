@@ -1621,16 +1621,7 @@ void ExposeTensorList(py::module &m) {
       Returns a tensor at given position `i` in the list.
       )code",
       py::keep_alive<0, 1>())
-#if 0  // TODO(spanev): figure out which return_value_policy to choose
-      .def("__getitem__",
-        [](TensorList<GPUBackend> &t, py::slice slice) -> py::tuple {
-          return TensorListGetItemSliceImpl(t, slice);
-        },
-      R"code(
-      Returns a tensor at given position in the list.
-      )code")
-#endif
-      .def("at",
+    .def("at",
         [&](TensorList<GPUBackend> &t, Index id) -> std::unique_ptr<Tensor<GPUBackend>> {
           std::cout << "Warning: `TensorListGPU.at` is deprecated for `TensorListGPU.__getitem__`. "
                        "It will be removed in future version of DALI."
