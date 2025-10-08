@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -121,6 +121,7 @@ def test_cuda_array_interface_tensor_list_gpu_create_copy_kernel():
 def test_cuda_array_interface_tensor_gpu_direct_creation():
     arr = cp.random.rand(3, 5, 6)
     tensor = TensorGPU(arr, "NHWC")
+    cp.cuda.runtime.deviceSynchronize()
     assert cp.allclose(arr, cp.asanyarray(tensor))
 
 
@@ -341,6 +342,7 @@ def test_tensor_gpu_from_cupy():
         return tensors.TensorGPU(a_gpu, "")
 
     out = [create_tmp(i) for i in range(4)]
+    cp.cuda.runtime.deviceSynchronize()
     for i, t in enumerate(out):
         np.testing.assert_array_equal(np.array(t.as_cpu()), np.full((4, 4), i))
 
@@ -352,6 +354,7 @@ def test_tensor_list_gpu_from_cupy():
         return tensors.TensorListGPU(a_gpu, "")
 
     out = [create_tmp(i) for i in range(4)]
+    cp.cuda.runtime.deviceSynchronize()
     for i, tl in enumerate(out):
         for j in range(4):
             np.testing.assert_array_equal(np.array(tl[j].as_cpu()), np.full(tl[j].shape(), i))
