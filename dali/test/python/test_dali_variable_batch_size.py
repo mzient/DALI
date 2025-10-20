@@ -1944,6 +1944,7 @@ tested_methods = [
     "full",
     "full_like",
     "io.file.read",
+    "clahe",
 ]
 
 excluded_methods = [
