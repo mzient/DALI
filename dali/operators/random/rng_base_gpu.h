@@ -31,10 +31,10 @@ namespace rng {
 struct SampleDesc {
   void *output;
   const void* input;
-  int64_t p_count;
-  int64_t p_stride;
-  int64_t c_count;
-  int64_t c_stride;
+  int64_t p_count;    // number of pixels
+  int64_t c_stride;   // channel stride - 1 for interleaved or plane size for planar
+  int p_stride;       // pixel stride - 1 for planar or nchannels for interleaved
+  int c_count;        // number of channels
 };
 
 struct BlockDesc {
@@ -43,23 +43,23 @@ struct BlockDesc {
   int64_t p_count;
 };
 
+struct Philox4x32State {
+  uint64_t counter[2];  // 128-bit integer
+  uint64_t key;         // random seed
+  // the phase is not used (it selects 32-bit words); we use 128-bit chunks here
+};
+
 template<>
 struct OperatorWithRngFields<GPUBackend> {
-  OperatorWithRngFields(int64_t seed, int max_batch_size,
-                        int64_t static_sample_size = -1)
-      : block_size_(static_sample_size < 0 ? 256 : std::min<int64_t>(static_sample_size, 256)),
-        max_blocks_(static_sample_size < 0 ?
-                        1024 :
-                        std::min<int64_t>(
-                            max_batch_size * div_ceil(static_sample_size, block_size_), 1024)),
-        randomizer_(seed, block_size_ * max_blocks_) {
-    sample_descs_cpu_.resize(max_batch_size);
-    block_descs_cpu_.resize(max_blocks_);
+  OperatorWithRngFields(int64_t seed) {
+    state_.key = seed;
   }
+
+  Philox4x32State state_ = {};
 
   const int block_size_;
   const int max_blocks_;
-  curand_states randomizer_;
+
 
   std::vector<SampleDesc> sample_descs_cpu_;
   std::vector<BlockDesc> block_descs_cpu_;

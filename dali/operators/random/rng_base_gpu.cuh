@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,14 +36,14 @@ template <typename T, typename Dist>
 __device__ __inline__ void Generate(const SampleDesc &sample,
                                     const BlockDesc &block,
                                     Dist& dist,
-                                    curandState* __restrict__ rng,
+                                    curandStatePhilox4_32_10_t &rng,
                                     bool_const<true>,     // is_noise_gen
                                     bool_const<true>) {   // is_per_channel
   auto out = static_cast<T*>(sample.output);
   auto in = static_cast<const T*>(sample.input);
   auto idx_end = block.p_offset + block.p_count;
   for (auto idx = block.p_offset + threadIdx.x; idx < idx_end; idx += blockDim.x) {
-    auto n = dist.Generate(in[idx], rng);
+    auto n = dist.Generate(in[idx], &rng);
     dist.Apply(out[idx], in[idx], n);
   }
 }
@@ -52,7 +52,7 @@ template <typename T, typename Dist>
 __device__ __inline__ void Generate(const SampleDesc &sample,
                                     const BlockDesc &block,
                                     Dist& dist,
-                                    curandState* __restrict__ rng,
+                                    curandStatePhilox4_32_10_t &rng,
                                     bool_const<true>,     // is_noise_gen
                                     bool_const<false>) {  // is_per_channel
   auto out = static_cast<T*>(sample.output);
@@ -62,7 +62,7 @@ __device__ __inline__ void Generate(const SampleDesc &sample,
     int64_t pos = idx * sample.p_stride;
     // Implementations that generate noise once for all channels should not depend on the input
     // to generate the number.
-    auto n = dist.Generate({}, rng);
+    auto n = dist.Generate({}, &rng);
     for (int c = 0; c < sample.c_count; c++, pos += sample.c_stride) {
       dist.Apply(out[pos], in[pos], n);
     }
@@ -73,13 +73,13 @@ template <typename T, typename Dist>
 __device__ __inline__ void Generate(const SampleDesc &sample,
                                     const BlockDesc &block,
                                     Dist& dist,
-                                    curandState* __restrict__ rng,
+                                    curandStatePhilox4_32_10_t &rng,
                                     bool_const<false>,     // is_noise_gen
                                     bool_const<true>) {    // is_per_channel
   auto out = static_cast<T*>(sample.output);
   auto idx_end = block.p_offset + block.p_count;
   for (auto idx = block.p_offset + threadIdx.x; idx < idx_end; idx += blockDim.x) {
-    auto n = dist.Generate(rng);
+    auto n = dist.Generate(&rng);
     out[idx] = ConvertSat<T>(n);
   }
 }
@@ -88,37 +88,49 @@ template <typename T, typename Dist>
 __device__ __inline__ void Generate(const SampleDesc &sample,
                                     const BlockDesc &block,
                                     Dist& dist,
-                                    curandState* __restrict__ rng,
+                                    curandStatePhilox4_32_10_t &rng,
                                     bool_const<false>,      // is_noise_gen
                                     bool_const<false>) {    // is_per_channel
   auto out = static_cast<T*>(sample.output);
   auto idx_end = block.p_offset + block.p_count;
   for (auto idx = block.p_offset + threadIdx.x; idx < idx_end; idx += blockDim.x) {
     int64_t pos = idx * sample.p_stride;
-    auto n = dist.Generate(rng);
+    auto n = dist.Generate(&rng);
     for (int c = 0; c < sample.c_count; c++, pos += sample.c_stride) {
       out[pos] = ConvertSat<T>(n);
     }
   }
 }
 
+/** Kernel for generating random numbers for a batch of samples.
+ *
+ * Layout:
+ * - threadIdx.x, blockIdx.x - together form the offset within a logical block
+ * - blockDim.x * gridDim.x - the processing stride of a single block - this allows to
+ *                            use multiple CUDA blocks to process a single logical block
+ * - threadIdx.y - not used
+ * - blockIdx.y - the index of the logical block processed by the current CUDA block
+ * - gridDim.y - the number of CUDA blocks - can be less than the number of logical blocks, in
+ *               which case the kernel loops over the logical blocks with gridDim.y stride.
+ */
 template <typename T, typename Dist, bool DefaultDist, bool IsNoiseGen, bool IsPerChannel>
-__global__ void RNGKernel(SampleDesc* __restrict__ sample_descs,
-                          BlockDesc* __restrict__ block_descs,
-                          curandState* __restrict__ states,
-                          const Dist* __restrict__ dists, int nblocks) {
-  int block_size = blockDim.x * blockDim.y;
-  int local_tid = blockDim.x * threadIdx.y + threadIdx.x;
-  int64_t global_tid = blockIdx.y * block_size + local_tid;
-  auto rng = states + global_tid;
-  int blk_stride = blockDim.y * gridDim.y;
-  int blk = blockIdx.y * blockDim.y + threadIdx.y;
-  for (; blk < nblocks; blk += blk_stride) {
+__global__ void __launch_bounds__(256)
+RNGKernel(SampleDesc* __restrict__ sample_descs,
+          BlockDesc* __restrict__ block_descs,
+          const Dist* __restrict__ dists,
+          curandStatePhilox4_32_10_t initial_state,
+          int nblocks) {
+  for (int blk = blockIdx.y; blk < nblocks; blk += gridDim.y) {  // loop over logical blocks
     auto block = block_descs[blk];
     auto sample = sample_descs[block.sample_idx];
-    Dist dist = DefaultDist ? Dist() : dists[block.sample_idx];
-    Generate<T, Dist>(sample, block, dist, rng,
-                      bool_const<IsNoiseGen>(), bool_const<IsPerChannel>());
+    curandStatePhilox4_32_10_t state = initial_state;
+    curand_skipahead_sequence(&state, block.sample_idx);
+    if constexpr (DefaultDist) {
+      Generate<T, Dist>(sample, block, Dist(), state, is_noise_gen, is_per_channel);
+    } else {
+      Dist dist = dists[block.sample_idx];
+      Generate<T, Dist>(sample, block, dist, state, is_noise_gen, is_per_channel);
+    }
   }
 }
 
