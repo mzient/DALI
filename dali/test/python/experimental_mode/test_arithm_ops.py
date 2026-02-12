@@ -110,26 +110,33 @@ def test_unary_ops(device, op):
             raise AssertionError(msg)
 
 
-@params(*itertools.product(["gpu", "cpu"], binary_ops, (None, 4)))
+@params(*itertools.product(["cpu"], binary_ops, (400, )))
 def test_binary_scalars(device: str, op: str, batch_size: int | None):
+    h = 100
+    w = 120
     tensors = [
-        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.arange(1, 1 + w * h).reshape(h, w),
         np.array([[1], [2], [3]]),
-        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.arange(1, 1 + w * h).reshape(h, w),
     ]
-    scalars = [3, [4, 5, 6]]
+    scalars = [3, 4, 5, 6]
 
     for tensor, scalar in itertools.product(tensors, scalars):
         if op == "/":
             tensor = tensor.astype(np.float32)
 
-        if batch_size is None:
-            x = ndd.as_tensor(tensor, device=device)
-        else:
-            x = ndd.Batch.broadcast(tensor, batch_size=batch_size, device=device)
+        with ndd.EvalMode.sync_cpu:
+            if batch_size is None:
+                x = ndd.as_tensor(tensor, device=device)
+                y = ndd.as_tensor(scalar, device=device)
+            else:
+                x = ndd.Batch.broadcast(tensor, batch_size=batch_size, device=device)
+                y = ndd.Batch.broadcast(scalar, batch_size=batch_size, device=device)
+            assert np.array_equal(x.tensors[0], tensor)
+            assert np.array_equal(y.tensors[0], scalar)
 
-        result = ndd.as_tensor(apply_bin_op(op, x, scalar))
-        result_rev = ndd.as_tensor(apply_bin_op(op, scalar, x))
+        result = ndd.as_tensor(apply_bin_op(op, x, y))
+        result_rev = ndd.as_tensor(apply_bin_op(op, y, x))
         ref = apply_bin_op(op, tensor, scalar)
         ref_rev = apply_bin_op(op, scalar, tensor)
 

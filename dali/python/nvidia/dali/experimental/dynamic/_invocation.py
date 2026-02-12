@@ -168,6 +168,7 @@ class Invocation:
             # else - deferred evaluation
 
     def run(self, ctx: Optional[_EvalContext] = None):
+        print(f"Run {id(self)}")
         """Executes the operator immediately."""
         if future := self._future:
             with nvtx.annotate("Invocation.wait", domain="invocation"):
@@ -181,6 +182,7 @@ class Invocation:
 
     def schedule(self, ctx: Optional[_EvalContext] = None):
         """Schedule the asynchronous execution of the operator"""
+        print(f"Schedule {id(self)}")
 
         # Note: this function can only be called once, soon after the instance creation
         # so we don't have to worry about thread-safety
@@ -213,6 +215,8 @@ class Invocation:
 
         if self._results is not None:
             return
+
+        print(f"_run_impl body {id(self)}")
 
         with nvtx.annotate("Invocation.run", domain="invocation"):
             # If the invocation was created with a GPU device, validate that
