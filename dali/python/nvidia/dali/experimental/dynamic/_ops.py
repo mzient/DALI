@@ -104,12 +104,14 @@ class Operator:
         cls,
         max_batch_size: int,
         name: str | None = None,
-        backend: str | None = None,
         device: DeviceLike | None = None,
         num_inputs: int | None = None,
         call_arg_names: list[str] | None = None,
         _backend: str | None = None,
-        **init_args,
+        *,
+        inputs,
+        init_args,
+        call_args,
     ):
         """Gets an operator instance for a specified set of parameters."""
         if device is None:
@@ -124,7 +126,7 @@ class Operator:
 
         def freeze_args(args):
             sorted_keys = sorted(args.keys())
-            return tuple([(k, freeze_arg(args[k])) for k in sorted_keys])
+            return tuple([(k, args[k]) for k in sorted_keys])
 
         call_arg_names = freeze_arg(call_arg_names)
         key = (
@@ -135,9 +137,11 @@ class Operator:
             num_inputs,
             call_arg_names,
             freeze_args(init_args),
+            tuple((cls._make_meta(input) for input in inputs)),
+            freeze_args({ name : cls._make_meta(arg) for name, arg in call_args.items() }),
         )
         ctx = _eval_context.EvalContext.current()
-        inst = ctx._instance_cache.get(key, None)
+        inst = ctx._instance_cache.pop(key, None)
         if inst is None:
             with device:
                 inst = cls(
@@ -147,7 +151,8 @@ class Operator:
                     _backend=_backend,
                     **init_args,
                 )
-                ctx._instance_cache[key] = inst
+        inst._cache = ctx._instance_cache
+        inst._key = key
         return inst
 
     def _infer_num_outputs(self, *inputs, **args):
@@ -185,6 +190,8 @@ class Operator:
     def _reset_backend(self):
         self._op_backend = None
         self._op_spec = None
+        self._input_meta = []
+        self._arg_meta = {}
 
     def _init_spec(self, inputs, args):
         if self._op_spec is None:
@@ -293,12 +300,8 @@ class Operator:
 
             is_batch = batch_size is not None or _is_batch()
             if self._is_backend_initialized():
-                if self._is_stateful:
-                    # clearing the backend in a stateful op would destroy the state
-                    self._check_compatible(inputs, batch_size, args)
-                elif not self._is_compatible(inputs, batch_size, args):
-                    # we can reinitialize a stateless operator - not very efficient :(
-                    self._reset_backend()
+                # clearing the backend in a stateful op would destroy the state
+                self._check_compatible(inputs, batch_size, args)
 
             self._init_backend(ctx, inputs, args)
             workspace = _b._Workspace(ctx._thread_pool, ctx.cuda_stream)
@@ -321,17 +324,6 @@ class Operator:
     def _set_meta(self, inputs, args):
         self._input_meta = [self._make_meta(input) for input in inputs]
         self._arg_meta = {name: self._make_meta(arg) for name, arg in args.items()}
-
-    def _is_compatible(self, inputs, batch_size, args):
-        """Checks if the inputs and arguments are compatible with this operator instance."""
-        if batch_size is not None:
-            if batch_size > self._max_batch_size:
-                return False
-        if self._input_meta != [self._make_meta(input) for input in inputs]:
-            return False
-        if self._arg_meta != {name: self._make_meta(arg) for name, arg in args.items()}:
-            return False
-        return True
 
     def _check_compatible(self, inputs, batch_size, args):
         """Raises an error if the inputs and arguments are not compatible with this op instance."""
@@ -382,7 +374,8 @@ class Operator:
                 )
 
     # TODO(klecki): Consider making a dataclass
-    def _make_meta(self, x):
+    @staticmethod
+    def _make_meta(x):
         is_batch = False
         if isinstance(x, _invocation.Invocation):
             is_batch = x.is_batch
@@ -391,12 +384,12 @@ class Operator:
         else:
             is_batch = False
 
-        return {
-            "is_batch": is_batch,
-            "ndim": x.ndim,
-            "layout": x.layout,
-            "dtype": x.dtype,
-        }
+        return (
+            is_batch,
+            x.ndim,
+            x.layout,
+            x.dtype.type_id,
+        )
 
     @property
     def _display_name(self):

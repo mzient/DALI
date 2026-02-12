@@ -297,6 +297,25 @@ def _get_inputs(schema):
     return inputs
 
 
+def _infer_batch_size(op_instance, batch_size, *raw_args, **raw_kwargs):
+    with nvtx.annotate("_infer_batch_size", domain="op_builder"):
+        is_batch = batch_size is not None
+        if batch_size is None:
+            for i, x in enumerate(list(raw_args) + list(raw_kwargs.values())):
+                x_batch_size = _get_batch_size(x)
+                if x_batch_size is not None:
+                    is_batch = True
+                    if batch_size is not None:
+                        if x_batch_size != batch_size:
+                            raise ValueError(
+                                f"Inconsistent batch size: {x_batch_size} != {batch_size}"
+                            )
+                    else:
+                        batch_size = x_batch_size
+        if not is_batch:
+            batch_size = op_instance._max_batch_size or 1
+    return batch_size, is_batch
+
 def build_call_function(schema, op_class):
     """
     Generates __call__ method for an operator subclass.
@@ -338,22 +357,7 @@ def build_call_function(schema, op_class):
     def call(self, *raw_args, batch_size=None, **raw_kwargs):
         with nvtx.annotate(f"__call__: {self._op_name}", domain="op_builder"):
             self._pre_call(*raw_args, **raw_kwargs)
-            with nvtx.annotate("__call__: get batch size", domain="op_builder"):
-                is_batch = batch_size is not None
-                if batch_size is None:
-                    for i, x in enumerate(list(raw_args) + list(raw_kwargs.values())):
-                        x_batch_size = _get_batch_size(x)
-                        if x_batch_size is not None:
-                            is_batch = True
-                            if batch_size is not None:
-                                if x_batch_size != batch_size:
-                                    raise ValueError(
-                                        f"Inconsistent batch size: {x_batch_size} != {batch_size}"
-                                    )
-                            else:
-                                batch_size = x_batch_size
-                if not is_batch:
-                    batch_size = self._max_batch_size or 1
+            batch_size, is_batch = _infer_batch_size(self, batch_size, *raw_args, **raw_kwargs)
 
             inputs = []
             kwargs = {}
@@ -582,7 +586,9 @@ def build_fn_wrapper(op, fn_name=None, add_to_module=True):
                 num_inputs=len(inputs),
                 call_arg_names=tuple(call_args.keys()),
                 _backend=backend,
-                **init_args,
+                inputs=inputs,
+                init_args=init_args,
+                call_args=call_args,
             )
 
         # Call the operator (the result is an Invocation object)

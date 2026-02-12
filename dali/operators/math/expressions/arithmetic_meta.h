@@ -877,7 +877,7 @@ struct arithm_meta<ArithmeticOp::div, Backend> {
   using result_t = binary_result_t<L, R>;
 
   template <typename L, typename R>
-  DALI_HOST_DEV static constexpr result_t<L, R> impl(L l, R r) {
+  DALI_HOST_DEV static result_t<L, R> impl(const L &l, const R &r) {
     auto l_ = static_cast<result_t<L, R>>(l);
     auto r_ = static_cast<result_t<L, R>>(r);
     #ifndef __CUDA_ARCH__

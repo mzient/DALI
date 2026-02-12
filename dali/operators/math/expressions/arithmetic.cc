@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,17 @@ namespace expr {
 
 template <>
 void ArithmeticGenericOp<CPUBackend>::RunImpl(Workspace &ws) {
+  std::stringstream ss;
+  for (int i = 0; i < ws.NumInput(); i++) {
+    auto &inp = ws.Input<CPUBackend>(i);
+    print(ss, "input #", i, " " , inp.type(), "\n");
+    for (int s = 0; s < inp.num_samples(); s++)
+      print(ss, "  sample ", s, " ", (uintptr_t)inp.raw_tensor(s), " shape ", inp.tensor_shape(s), "\n");
+  }
+  ss << "\n";
+  print(ss, spec_.GetArgument<std::string>("expression_desc"), "\n");
+  print(std::cout, ss.str());
+  std::cout << std::flush;
   PrepareSamplesPerTask<CPUBackend>(samples_per_task_, exec_order_, ws, constant_storage_, spec_);
   auto &pool = ws.GetThreadPool();
   ws.Output<CPUBackend>(0).SetLayout(result_layout_);

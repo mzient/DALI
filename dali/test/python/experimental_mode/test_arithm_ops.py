@@ -110,31 +110,38 @@ def test_unary_ops(device, op):
             raise AssertionError(msg)
 
 
-@params(*itertools.product(["cpu"], binary_ops, (400, )))
-def test_binary_scalars(device: str, op: str, batch_size: int | None):
-    h = 100
-    w = 120
-    tensors = [
-        np.arange(1, 1 + w * h).reshape(h, w),
-        np.array([[1], [2], [3]]),
-        np.arange(1, 1 + w * h).reshape(h, w),
-    ]
-    scalars = [3, 4, 5, 6]
+h = 100
+w = 120
+tensors = [
+    np.arange(1, 1 + w * h).reshape(h, w),
+    np.array([[1], [2], [3]]),
+    np.arange(1, 1 + w * h).reshape(h, w),
+]
+scalars = [3, 4, 5, 6]
+scalars = [np.array(x, dtype=np.int32) for x in scalars]
 
+
+@params(*itertools.product(["cpu"], ['//'] * 20, (4, )))
+def test_binary_scalars(device: str, op: str, batch_size: int | None):
+    print("=====================================================================\n")
     for tensor, scalar in itertools.product(tensors, scalars):
         if op == "/":
             tensor = tensor.astype(np.float32)
 
+        print(f"tt = {tensor.ctypes.data}")
         with ndd.EvalMode.sync_cpu:
             if batch_size is None:
-                x = ndd.as_tensor(tensor, device=device)
-                y = ndd.as_tensor(scalar, device=device)
+                x = ndd.as_tensor(tensor, device=device).evaluate()
+                y = ndd.as_tensor(scalar, device=device).evaluate()
             else:
-                x = ndd.Batch.broadcast(tensor, batch_size=batch_size, device=device)
-                y = ndd.Batch.broadcast(scalar, batch_size=batch_size, device=device)
+                tt = ndd.as_tensor(tensor, device=device)
+                x = ndd.Batch.broadcast(tt, batch_size=batch_size, device=device).evaluate()
+                y = ndd.Batch.broadcast(scalar, batch_size=batch_size, device=device).evaluate()
             assert np.array_equal(x.tensors[0], tensor)
             assert np.array_equal(y.tensors[0], scalar)
 
+        print(f"x  = {x.tensors[0]._storage.data_ptr()}, y  = {y.tensors[0]._storage.data_ptr()}")
+        print(f"xx = {x._storage[0].data_ptr()}, yy = {y._storage[0].data_ptr()}")
         result = ndd.as_tensor(apply_bin_op(op, x, y))
         result_rev = ndd.as_tensor(apply_bin_op(op, y, x))
         ref = apply_bin_op(op, tensor, scalar)

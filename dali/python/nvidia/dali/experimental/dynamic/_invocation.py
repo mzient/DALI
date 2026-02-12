@@ -85,6 +85,14 @@ class Invocation:
         self._future: Optional[_Future] = None
         self._run_lock = threading.Lock()
 
+    def __del__(self):
+        self._return_op_to_cache()
+
+    def _return_op_to_cache(self):
+        if (cache := getattr(self._operator, "_cache", None)) is not None:
+            cache[self._operator._key] = self._operator
+        self._return_op_to_cache = lambda: None
+
     def device(self, result_index: int):
         if self._output_devices is None:
             self._output_devices = self._operator._infer_output_devices(*self._inputs, **self._args)
@@ -168,7 +176,6 @@ class Invocation:
             # else - deferred evaluation
 
     def run(self, ctx: Optional[_EvalContext] = None):
-        print(f"Run {id(self)}")
         """Executes the operator immediately."""
         if future := self._future:
             with nvtx.annotate("Invocation.wait", domain="invocation"):
@@ -182,7 +189,6 @@ class Invocation:
 
     def schedule(self, ctx: Optional[_EvalContext] = None):
         """Schedule the asynchronous execution of the operator"""
-        print(f"Schedule {id(self)}")
 
         # Note: this function can only be called once, soon after the instance creation
         # so we don't have to worry about thread-safety
@@ -215,8 +221,6 @@ class Invocation:
 
         if self._results is not None:
             return
-
-        print(f"_run_impl body {id(self)}")
 
         with nvtx.annotate("Invocation.run", domain="invocation"):
             # If the invocation was created with a GPU device, validate that
@@ -256,6 +260,7 @@ class Invocation:
             else:
                 self._results = (r,)
             ctx.cache_results(self, self._results)
+            self._return_op_to_cache()  # the operator instance is ready for a new invocation
 
     def values(self, ctx: Optional[_EvalContext] = None):
         """
