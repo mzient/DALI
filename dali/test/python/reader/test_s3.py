@@ -24,7 +24,8 @@ from nvidia.dali import pipeline_def
 
 import s3_test_utils as s3
 from nose_utils import assert_raises, attr
-from test_utils import compare_pipelines
+from nose2.tools import params
+from test_utils import compare_pipelines, get_dali_extra_path
 
 batch_size = 4
 num_threads = 4
@@ -38,11 +39,22 @@ g_index = None
 g_rec = None
 g_rec_index = None
 g_client = None
+g_video_root = None
 
 DATA_PREFIX = f"{s3.PREFIX}/data"
 WDS_PREFIX = f"{s3.PREFIX}/wds"
 MANY_PREFIX = f"{s3.PREFIX}/many"
 REC_PREFIX = f"{s3.PREFIX}/rec"
+VIDEO_PREFIX = f"{s3.PREFIX}/video"
+VIDEO_ROOT_PREFIX = f"{s3.PREFIX}/video_root"
+
+# Videos for each backend of the video reader, relative to DALI_extra/db/video - the CPU one
+# decodes only VP8, VP9 and MJPEG. The last file of each is larger than the 1 MiB I/O buffer the
+# reader uses for streamed videos, so decoding it takes several ranged reads, not just one.
+VIDEO_FILES = {
+    "cpu": ["vp9/vp9_0.mp4", "vp8/vp8.webm", "mjpeg/mjpeg.avi"],
+    "gpu": ["cfr_test.mp4", "vfr/test_2.mp4", "sintel/video_files/sintel_trailer-720p_2.mp4"],
+}
 
 
 def _make_local_dataset(root):
@@ -85,6 +97,37 @@ def _make_local_recordio(path, index_path, num_samples=8):
             offset += len(record)
 
 
+def _local_video(name):
+    return os.path.join(get_dali_extra_path(), "db", "video", name)
+
+
+def _remote_video(name):
+    return f"s3://{s3.BUCKET}/{VIDEO_PREFIX}/{name}"
+
+
+def _seed_videos(client):
+    for device_files in VIDEO_FILES.values():
+        for name in device_files:
+            client.upload_file(_local_video(name), s3.BUCKET, f"{VIDEO_PREFIX}/{name}")
+
+
+def _seed_video_root(client, root):
+    """Lays the videos out as a file_root for each backend, in a local directory and on S3.
+
+    Each subdirectory is a class and the first one holds two videos, so that they share a label.
+    The copy directly under the root is in no class: the local backend skips it, and listing the
+    bucket has to skip it as well.
+    """
+    for device, (first, second, third) in VIDEO_FILES.items():
+        layout = {"class_a": [first, second], "class_b": [third], "": [first]}
+        for subdir, names in layout.items():
+            dirpath = os.path.join(root, device, subdir)
+            os.makedirs(dirpath, exist_ok=True)
+            for name in names:
+                os.symlink(_local_video(name), os.path.join(dirpath, os.path.basename(name)))
+    s3.upload_dir(client, s3.BUCKET, root, VIDEO_ROOT_PREFIX)
+
+
 def _seed_many_objects(client, count=1100):
     def put(i):
         client.put_object(Bucket=s3.BUCKET, Key=f"{MANY_PREFIX}/c/{i:04}.dat", Body=b"x")
@@ -95,6 +138,7 @@ def _seed_many_objects(client, count=1100):
 
 def setUpModule():
     global g_server, g_tmpdir, g_root, g_files, g_tar, g_index, g_rec, g_rec_index, g_client
+    global g_video_root
     s3.require_mock_server()
 
     g_tmpdir = tempfile.TemporaryDirectory()
@@ -118,6 +162,9 @@ def setUpModule():
         g_client.upload_file(g_tar, s3.BUCKET, f"{WDS_PREFIX}/shard0.tar")
         g_client.upload_file(g_rec, s3.BUCKET, f"{REC_PREFIX}/train.rec")
         g_client.upload_file(g_rec_index, s3.BUCKET, f"{REC_PREFIX}/train.idx")
+        _seed_videos(g_client)
+        g_video_root = os.path.join(g_tmpdir.name, "video_root")
+        _seed_video_root(g_client, g_video_root)
 
         # everything past the first upload has to stay inside this try: unittest skips
         # tearDownModule once setUpModule raised, so the call below is the only thing that
@@ -292,3 +339,81 @@ def test_file_reader_missing_object():
 def test_file_reader_missing_bucket():
     with assert_raises(RuntimeError, glob="*NoSuchBucket*"):
         file_pipe(file_root=f"s3://{s3.MISSING_BUCKET}/data").build()
+
+
+@pipeline_def(batch_size=batch_size, num_threads=num_threads)
+def video_pipe(device, filenames=None, file_list=None, file_root=None, random_shuffle=False):
+    if filenames is not None:
+        source = dict(filenames=filenames, labels=list(range(len(filenames))))
+    elif file_root is not None:
+        source = dict(file_root=file_root)
+    else:
+        source = dict(file_list=file_list, file_list_format="frames")
+    return tuple(
+        fn.experimental.readers.video(
+            **source,
+            device=device,
+            name="Reader",
+            sequence_length=4,
+            stride=3,
+            step=15,
+            enable_frame_num=True,
+            enable_timestamps=True,
+            random_shuffle=random_shuffle,
+        )
+    )
+
+
+def _video_pipe(device, **kwargs):
+    return video_pipe(device, device_id=0 if device == "gpu" else None, seed=1234, **kwargs)
+
+
+def _epoch_size(pipe):
+    return pipe.reader_meta("Reader")["epoch_size"]
+
+
+def _compare_video_epoch(s3_pipe, local_pipe):
+    s3_pipe.build()
+    local_pipe.build()
+    epoch_size = _epoch_size(local_pipe)
+    assert _epoch_size(s3_pipe) == epoch_size, (_epoch_size(s3_pipe), epoch_size)
+    compare_pipelines(s3_pipe, local_pipe, batch_size, -(-epoch_size // batch_size))
+
+
+@params("cpu", "gpu")
+def test_video_reader_filenames(device):
+    """Shuffled, so that the decoder keeps switching files and seeking back and forth."""
+    files = VIDEO_FILES[device]
+    _compare_video_epoch(
+        _video_pipe(device, filenames=[_remote_video(f) for f in files], random_shuffle=True),
+        _video_pipe(device, filenames=[_local_video(f) for f in files], random_shuffle=True),
+    )
+
+
+@params("cpu", "gpu")
+def test_video_reader_file_list(device):
+    """Frame ranges that start mid-video, so that the first read is preceded by a seek."""
+
+    def write_list(path, make_path):
+        with open(path, "w") as f:
+            for label, name in enumerate(VIDEO_FILES[device]):
+                f.write(f"{make_path(name)} {label} {7 + label} 50\n")
+        return path
+
+    s3_list = write_list(os.path.join(g_tmpdir.name, f"s3_{device}.txt"), _remote_video)
+    local_list = write_list(os.path.join(g_tmpdir.name, f"local_{device}.txt"), _local_video)
+    _compare_video_epoch(
+        _video_pipe(device, file_list=s3_list), _video_pipe(device, file_list=local_list)
+    )
+
+
+@params("cpu", "gpu")
+def test_video_reader_file_root(device):
+    """The videos, and the labels taken from their subdirectories, come from listing the bucket.
+
+    The layout has a video directly under the root, which is in no class and has to be skipped.
+    """
+    _compare_video_epoch(
+        _video_pipe(device, file_root=f"s3://{s3.BUCKET}/{VIDEO_ROOT_PREFIX}/{device}"),
+        _video_pipe(device, file_root=os.path.join(g_video_root, device)),
+    )
