@@ -781,6 +781,10 @@ This option is mutually exclusive with `file_root` and `file_list`.)code",
     .AddOptionalArg("file_root",
                     R"code(Path to a directory that contains the data files.
 
+Remote directories can be specified with URLs, e.g. ``s3://bucket/videos`` or
+``gs://bucket/videos``. Each subdirectory is treated as a class, and files directly
+in ``file_root`` are skipped.
+
 This option is mutually exclusive with `filenames` and `file_list`.)code",
                     std::string())
     .AddOptionalArg("file_list",

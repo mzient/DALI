@@ -51,7 +51,8 @@ std::vector<FileLabelEntry> s3_discover_files(const std::string &file_root,
       [&](const std::string &object_key, size_t object_size) {
         auto p = std::filesystem::relative(object_key, parent_object_key);
         auto path_elems = count_elems(p);
-        assert(path_elems >= 2);
+        if (path_elems < 2)
+          return;  // objects directly under the root belong to no class
         if (path_elems > 2)
           return;  // we only look at one subdir level
         const auto& subdir = p.begin()->native();
